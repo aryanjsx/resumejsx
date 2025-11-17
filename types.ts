@@ -1,0 +1,94 @@
+export interface PersonalInfo {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin: string;
+  portfolio: string;
+}
+
+export interface WorkExperience {
+  id: string;
+  company: string;
+  role: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+
+export interface Education {
+  id:string;
+  institution: string;
+  degree: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  gpa: string;
+}
+
+export interface CategorizedSkill {
+  id: string;
+  category: string;
+  skills: string; // Comma-separated list
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  technologies: string;
+  startDate: string;
+  endDate: string;
+  liveLink: string;
+  githubLink: string;
+}
+
+export interface Certification {
+  id: string;
+  name: string;
+  issuer: string;
+  date: string;
+}
+
+export interface ResumeData {
+  personalInfo: PersonalInfo;
+  summary: string;
+  experience: WorkExperience[];
+  education: Education[];
+  skills: CategorizedSkill[];
+  projects: Project[];
+  certifications: Certification[];
+}
+
+export interface ATSFeedback {
+    issue: string;
+    suggestion: string;
+    severity: 'High' | 'Medium' | 'Low';
+}
+
+export interface ScoreBreakdownItem {
+    category: string;
+    score: number;
+    maxScore: number;
+}
+
+export interface ATSScore {
+    overallScore: number;
+    breakdown: ScoreBreakdownItem[];
+    feedback: ATSFeedback[];
+}
+
+export interface JDOptimizationSuggestion {
+    area: string;
+    suggestion: string;
+    impact: 'High' | 'Medium' | 'Low';
+}
+
+export interface JDMatchAnalysis {
+    matchPercentage: number;
+    atsScoreAsPerJD: number;
+    missingKeywords: string[];
+    redundantKeywords: string[];
+    suggestions: JDOptimizationSuggestion[];
+}
