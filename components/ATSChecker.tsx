@@ -3,6 +3,7 @@ import { getATSScore } from '../services/geminiService';
 import { ATSScore, ATSFeedback } from '../types';
 import Loader from './Loader';
 import ScoreGauge from './ScoreGauge';
+import { extractRawText } from 'mammoth';
 
 const ATSChecker: React.FC<{ initialResumeText?: string }> = ({ initialResumeText }) => {
   const [resumeContent, setResumeContent] = useState<string | { data: string; mimeType: string }>(initialResumeText || '');
@@ -44,23 +45,43 @@ const ATSChecker: React.FC<{ initialResumeText?: string }> = ({ initialResumeTex
       
       setFileName(file.name);
       setError(null);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const base64Data = dataUrl.split(',')[1];
-        if (!base64Data) {
-            setError('Failed to read file content.');
-            setFileName('');
-            return;
-        }
-        setResumeContent({ data: base64Data, mimeType: file.type });
-        setIsUsingBuilderResume(false);
-      };
-      reader.onerror = () => {
-        setError('Failed to read the file.');
-        setFileName('');
-      };
-      reader.readAsDataURL(file);
+
+      if (fileNameLower.endsWith('.docx')) {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+              const arrayBuffer = e.target?.result as ArrayBuffer;
+              try {
+                  const result = await extractRawText({ arrayBuffer });
+                  setResumeContent(result.value);
+                  setIsUsingBuilderResume(false);
+              } catch (err) {
+                  console.error(err);
+                  setError("Failed to read Word document.");
+              }
+          };
+          reader.readAsArrayBuffer(file);
+      } else if (file.type === 'text/plain' || fileNameLower.endsWith('.txt')) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+              setResumeContent(e.target?.result as string);
+              setIsUsingBuilderResume(false);
+          };
+          reader.readAsText(file);
+      } else {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            const base64Data = dataUrl.split(',')[1];
+            if (!base64Data) {
+                setError('Failed to read file content.');
+                setFileName('');
+                return;
+            }
+            setResumeContent({ data: base64Data, mimeType: file.type || 'application/pdf' });
+            setIsUsingBuilderResume(false);
+          };
+          reader.readAsDataURL(file);
+      }
     }
   };
 

@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { ATSScore, JDMatchAnalysis } from '../types';
+import { ATSScore, JDMatchAnalysis, ContentSuggestionResponse, RewrittenResume } from '../types';
 
 // FIX: Initialize the GoogleGenAI client directly with the environment variable as per guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -70,6 +69,117 @@ const jdMatchSchema = {
     required: ["matchPercentage", "atsScoreAsPerJD", "missingKeywords", "redundantKeywords", "suggestions"],
 };
 
+const contentSuggestionSchema = {
+    type: Type.OBJECT,
+    properties: {
+        suggestions: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of suggested text content for the resume."
+        }
+    },
+    required: ["suggestions"]
+};
+
+const rewrittenResumeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        personalInfo: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING },
+                email: { type: Type.STRING },
+                phone: { type: Type.STRING },
+                location: { type: Type.STRING },
+                linkedin: { type: Type.STRING },
+                portfolio: { type: Type.STRING },
+            },
+            required: ["name"]
+        },
+        summary: {
+            type: Type.OBJECT,
+            properties: {
+                content: { type: Type.STRING, description: "The completely rewritten professional summary." },
+                reasoning: { type: Type.STRING, description: "Why this summary is better for the JD." }
+            },
+            required: ["content", "reasoning"]
+        },
+        experience: {
+            type: Type.ARRAY,
+            description: "List of rewritten work experience entries.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    company: { type: Type.STRING, description: "Company name from original resume." },
+                    role: { type: Type.STRING, description: "Role/Title." },
+                    location: { type: Type.STRING, description: "Location of the company." },
+                    date: { type: Type.STRING, description: "Employment period (e.g. 'June 2024 - Present')." },
+                    rewrittenDescription: { type: Type.STRING, description: "The optimized description in paragraph format." },
+                    improvements: { 
+                        type: Type.ARRAY, 
+                        items: { type: Type.STRING },
+                        description: "List of specific improvements made (e.g. 'Added keyword X')."
+                    }
+                },
+                required: ["company", "role", "location", "date", "rewrittenDescription", "improvements"]
+            }
+        },
+        education: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     institution: { type: Type.STRING },
+                     degree: { type: Type.STRING },
+                     location: { type: Type.STRING },
+                     startDate: { type: Type.STRING },
+                     endDate: { type: Type.STRING },
+                     gpa: { type: Type.STRING }
+                 },
+                 required: ["institution", "degree"]
+             }
+        },
+        projects: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     title: { type: Type.STRING },
+                     technologies: { type: Type.STRING },
+                     startDate: { type: Type.STRING },
+                     endDate: { type: Type.STRING },
+                     description: { type: Type.STRING, description: "Rewritten description in paragraph format." },
+                     liveLink: { type: Type.STRING },
+                     githubLink: { type: Type.STRING }
+                 },
+                 required: ["title", "description"]
+             }
+        },
+        certifications: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     name: { type: Type.STRING },
+                     issuer: { type: Type.STRING },
+                     date: { type: Type.STRING }
+                 },
+                 required: ["name"]
+             }
+        },
+        skills: {
+            type: Type.OBJECT,
+            properties: {
+                finalList: { type: Type.STRING, description: "The final optimized list of skills formatted as bullet points (e.g., '• Category: Skill 1, Skill 2')." },
+                added: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Skills added based on JD." },
+                removed: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Irrelevant skills removed." }
+            },
+            required: ["finalList", "added", "removed"]
+        }
+    },
+    required: ["personalInfo", "summary", "experience", "education", "projects", "certifications", "skills"]
+};
+
 type ResumeContent = string | { data: string; mimeType: string };
 
 export const getATSScore = async (resume: ResumeContent): Promise<ATSScore> => {
@@ -88,7 +198,7 @@ Return the entire analysis in the specified JSON format. The resume is provided 
     : { inlineData: { data: resume.data, mimeType: resume.mimeType } };
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: prompt },
@@ -122,7 +232,7 @@ Return the entire analysis in the specified JSON format.`;
         : { inlineData: { data: resume.data, mimeType: resume.mimeType } };
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-2.5-flash",
         contents: {
             parts: [
                 { text: prompt },
@@ -139,3 +249,85 @@ Return the entire analysis in the specified JSON format.`;
     const jsonText = response.text.trim();
     return JSON.parse(jsonText) as JDMatchAnalysis;
 };
+
+export const generateContentSuggestions = async (
+    type: 'summary' | 'experience',
+    context: { role?: string; company?: string; currentText?: string; resumeContext?: string }
+): Promise<ContentSuggestionResponse> => {
+    let prompt = "";
+
+    if (type === 'summary') {
+        prompt = `Act as a professional resume writer.
+        Task: Write 3 distinct, impactful professional summaries for a resume.
+        Context:
+        ${context.resumeContext ? `Based on the following existing resume info: ${context.resumeContext}` : ''}
+        ${context.currentText ? `Improve this existing summary: ${context.currentText}` : ''}
+
+        The summaries should be concise (2-4 sentences), professional, and highlight key strengths.
+        Return the result as a JSON object with a 'suggestions' array containing the 3 strings.`;
+    } else {
+        prompt = `Act as a professional resume writer.
+        Task: Write 5 strong, quantifiable, action-oriented bullet points for a Work Experience section.
+        Role: ${context.role || 'Professional'}
+        Company: ${context.company || 'Company'}
+        ${context.currentText ? `Context/Draft: ${context.currentText}` : ''}
+
+        Use the STAR method (Situation, Task, Action, Result) where possible. Start with strong action verbs.
+        Return the result as a JSON object with a 'suggestions' array containing the 5 strings.`;
+    }
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: { parts: [{ text: prompt }] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: contentSuggestionSchema,
+        },
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText) as ContentSuggestionResponse;
+};
+
+export const rewriteResume = async (resume: ResumeContent, jdText: string): Promise<RewrittenResume> => {
+    const prompt = `Act as an expert Resume Rewriter and ATS Optimization Specialist.
+    
+    Your Task:
+    1. **Strictly Preserve:** Parse the original resume and extract 'Personal Information', 'Education', and 'Certifications' EXACTLY as they appear. Do NOT change, summarize, or reformat these sections.
+    2. **Rewrite & Optimize Core Sections:**
+       - **Summary:** Write a powerful, hook-filled summary that immediately highlights experience relevant to the JD.
+       - **Experience:** For each work experience entry found in the resume:
+         - Keep the Company, Role, Location, and Dates (as a single string) the same.
+         - REWRITE the description into a compelling, professional paragraph using the STAR method (Situation, Task, Action, Result). Do NOT use bullet points for description.
+         - INTEGRATE keywords from the JD naturally.
+         - Quantify achievements where possible.
+       - **Projects:** For each project:
+         - Keep the Title, Technologies, and Dates same.
+         - REWRITE the description into a concise professional paragraph that highlights technical achievements and alignment with the JD. Do NOT use bullet points.
+       - **Skills:** Curate a list of skills (categorized if possible) that combines the user's existing skills with relevant missing skills from the JD. Format the final list as bullet points (e.g., "• Category: Skill 1, Skill 2").
+    
+    Return the output as a JSON object containing all sections.
+    `;
+
+    const resumePart = typeof resume === 'string'
+        ? { text: `Original Resume:\n---\n${resume}\n---` }
+        : { inlineData: { data: resume.data, mimeType: resume.mimeType } };
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: {
+            parts: [
+                { text: prompt },
+                { text: `Target Job Description:\n---\n${jdText}\n---` },
+                resumePart,
+            ]
+        },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: rewrittenResumeSchema,
+        }
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText) as RewrittenResume;
+}

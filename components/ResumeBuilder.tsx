@@ -1,7 +1,10 @@
+
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { ResumeData, PersonalInfo, WorkExperience, Education, CategorizedSkill, Project, Certification } from '../types';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType, TabStopPosition } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType, TabStopPosition, BorderStyle } from 'docx';
 import saveAs from 'file-saver';
+import { generateContentSuggestions } from '../services/geminiService';
+import Loader from './Loader';
 
 const initialResumeData: ResumeData = {
   personalInfo: {
@@ -23,6 +26,13 @@ const initialResumeData: ResumeData = {
 const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAnalyze}) => {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
+  
+  // AI Suggestion State
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiTarget, setAiTarget] = useState<{ type: 'summary' | 'experience'; id?: string } | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const savedData = localStorage.getItem('resumeData');
@@ -73,6 +83,49 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     }));
   };
 
+  // AI Generation Handlers
+  const handleGenerateSummary = async () => {
+    setAiLoading(true);
+    setAiTarget({ type: 'summary' });
+    setIsAiModalOpen(true);
+    setAiSuggestions([]);
+    setSelectedSuggestions([]);
+
+    try {
+      // Construct context from existing resume data to help the AI
+      const contextString = `Name: ${resumeData.personalInfo.name}, Role Title (if any): ${resumeData.experience?.[0]?.role || 'Professional'}. 
+      Experience: ${resumeData.experience.map(e => `${e.role} at ${e.company}`).join(', ')}`;
+
+      const response = await generateContentSuggestions('summary', {
+        currentText: resumeData.summary,
+        resumeContext: contextString
+      });
+      setAiSuggestions(response.suggestions);
+    } catch (error) {
+      console.error("Error generating summary:", error);
+      setAiSuggestions(["Error generating suggestions. Please check your API connection."]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleApplySuggestions = () => {
+      if (!aiTarget) return;
+
+      if (aiTarget.type === 'summary') {
+          // For summary, replace the text with the selected suggestion
+          const newText = selectedSuggestions.join(' ');
+          setResumeData(prev => ({ ...prev, summary: newText }));
+      }
+      setIsAiModalOpen(false);
+  };
+
+  const toggleSuggestionSelection = (suggestion: string) => {
+      // Radio button behavior for summary (select only one)
+      setSelectedSuggestions([suggestion]);
+  };
+
+
   const handlePrint = () => {
     window.print();
   };
@@ -84,7 +137,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
       return new Paragraph({
         children: [new TextRun({ text: text.toUpperCase(), bold: true, color: "1155cc", size: 24 })],
         border: {
-          bottom: { color: "auto", space: 1, value: "single", size: 6 },
+          bottom: { color: "auto", space: 1, style: BorderStyle.SINGLE, size: 6 },
         },
         spacing: { after: 200 },
       });
@@ -324,7 +377,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
   return (
     <>
-      {/* Fullscreen Modal */}
+      {/* Fullscreen Preview Modal */}
       {isPreviewFullScreen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4" onClick={() => setIsPreviewFullScreen(false)}>
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto relative" onClick={(e) => e.stopPropagation()}>
@@ -342,6 +395,77 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Content Suggestion Modal */}
+      {isAiModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" onClick={() => !aiLoading && setIsAiModalOpen(false)}>
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-blue-50 rounded-t-lg">
+                      <div className="flex items-center gap-2">
+                          <span className="text-2xl">✨</span>
+                          <h3 className="text-xl font-bold text-gray-800">AI Suggestions</h3>
+                      </div>
+                      {!aiLoading && (
+                          <button onClick={() => setIsAiModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                          </button>
+                      )}
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto flex-grow">
+                      {aiLoading ? (
+                          <div className="flex flex-col items-center justify-center py-10">
+                              <Loader />
+                              <p className="mt-4 text-gray-600 font-medium">Generating creative content...</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-3">
+                              <p className="text-sm text-gray-500 mb-3">
+                                  Select the option that best fits your profile:
+                              </p>
+                              {aiSuggestions.map((suggestion, idx) => (
+                                  <div 
+                                      key={idx} 
+                                      className={`p-3 rounded-md border cursor-pointer transition-all ${selectedSuggestions.includes(suggestion) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
+                                      onClick={() => toggleSuggestionSelection(suggestion)}
+                                  >
+                                      <div className="flex items-start gap-3">
+                                          <div className={`mt-1 w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedSuggestions.includes(suggestion) ? 'bg-blue-600 border-blue-600' : 'border-gray-400 bg-white'}`}>
+                                              {selectedSuggestions.includes(suggestion) && (
+                                                  <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                  </svg>
+                                              )}
+                                          </div>
+                                          <p className="text-gray-800 text-sm leading-relaxed">{suggestion}</p>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="p-5 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end gap-3">
+                      <button 
+                          onClick={() => setIsAiModalOpen(false)} 
+                          className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                          disabled={aiLoading}
+                      >
+                          Cancel
+                      </button>
+                      <button 
+                          onClick={handleApplySuggestions} 
+                          disabled={aiLoading || selectedSuggestions.length === 0}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Use Selected
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -362,7 +486,15 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
           </div>
           {/* Summary */}
           <div className="mb-6">
-            <h3 className="text-xl font-semibold mb-3">Professional Summary</h3>
+            <div className="flex justify-between items-end mb-3">
+                <h3 className="text-xl font-semibold">Professional Summary</h3>
+                <button 
+                    onClick={handleGenerateSummary} 
+                    className="text-sm flex items-center gap-1 text-purple-600 hover:text-purple-800 font-medium px-3 py-1 bg-purple-50 hover:bg-purple-100 rounded-full transition"
+                >
+                    <span>✨</span> AI Assist
+                </button>
+            </div>
             <textarea value={resumeData.summary} onChange={handleSummaryChange} placeholder="Summary" className={`${inputClasses} h-24`} />
           </div>
           {/* Experience */}
@@ -379,7 +511,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                       <input name="startDate" value={exp.startDate} onChange={(e) => handleItemChange('experience', exp.id, e)} placeholder="Start Date" className={`${inputClasses} w-1/2`}/>
                       <input name="endDate" value={exp.endDate} onChange={(e) => handleItemChange('experience', exp.id, e)} placeholder="End Date" className={`${inputClasses} w-1/2`}/>
                   </div>
-                  <textarea name="description" value={exp.description} onChange={(e) => handleItemChange('experience', exp.id, e)} placeholder="Description (use '-' for bullet points)" className={`${inputClasses} h-20`}/>
+                  <div className="relative">
+                      <textarea name="description" value={exp.description} onChange={(e) => handleItemChange('experience', exp.id, e)} placeholder="Description (use '-' for bullet points)" className={`${inputClasses} h-24 mb-1`}/>
+                  </div>
                   <button onClick={() => handleRemoveItem('experience', exp.id)} className="text-red-500 mt-2 text-sm hover:underline">Remove</button>
               </div>
             ))}

@@ -35,10 +35,11 @@ const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule }) => {
             </svg>
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">AI Resume Architect</h1>
           </div>
-          <nav className="flex items-center space-x-2 md:space-x-4 p-1 bg-gray-100 rounded-lg">
+          <nav className="flex items-center space-x-1 md:space-x-2 p-1 bg-gray-100 rounded-lg overflow-x-auto">
             <NavItem label="Builder" isActive={activeModule === 'builder'} onClick={() => setActiveModule('builder')} />
             <NavItem label="ATS Checker" isActive={activeModule === 'ats'} onClick={() => setActiveModule('ats')} />
             <NavItem label="JD Matcher" isActive={activeModule === 'jd'} onClick={() => setActiveModule('jd')} />
+            <NavItem label="Smart Rewriter" isActive={activeModule === 'rewriter'} onClick={() => setActiveModule('rewriter')} />
           </nav>
         </div>
       </div>

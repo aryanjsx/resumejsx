@@ -1,11 +1,11 @@
 
-# AI Resume Builder 🤖📄
+# AI Resume Architect 🤖📄
 
 ### Your Personal AI-Powered Career Toolkit to Build, Analyze, and Optimize Your Resume for Success.
 
 ---
 
-**AI Resume Builder** is an all-in-one, modern web application designed to empower job seekers in their career journey. Leveraging the power of Google's Gemini AI, this tool goes beyond a simple text editor, offering a suite of intelligent features to help you craft the perfect resume, pass through Applicant Tracking Systems (ATS), and tailor your application to specific job roles.
+**AI Resume Architect** is an all-in-one, modern web application designed to empower job seekers in their career journey. Leveraging the power of Google's Gemini AI, this tool goes beyond a simple text editor, offering a suite of intelligent features to help you craft the perfect resume, pass through Applicant Tracking Systems (ATS), and tailor your application to specific job roles.
 
 ---
 
@@ -16,8 +16,14 @@
   -  Enjoy a seamless experience with a live, real-time preview that updates as you type.
   -  Your progress is automatically saved to your browser's local storage, so you'll never lose your work.
 
+- **🔄 Smart Resume Rewriter:**
+  -  **Tailor to JD:** Automatically rewrite your entire resume to align perfectly with a specific job description.
+  -  **Optimized Formatting:** Converts experience and project descriptions into compelling **STAR-method paragraphs** for better readability and flow, while strictly formatting skills into clean **bullet points**.
+  -  **Keyword Integration:** Naturally weaves high-value keywords from the JD into your professional summary and experience.
+  -  **Strict Parsing:** Preserves your personal details, education history, and certifications exactly as they are.
+
 - **📊 AI-Powered ATS Score Checker:**
-  -  Analyze your resume (either from the builder or by uploading a file) to get an instant ATS compatibility score from 0-100.
+  -  Analyze your resume (supports **PDF**, **Word .docx**, and **TXT**) to get an instant ATS compatibility score from 0-100.
   -  Receive a detailed score breakdown across key categories like **Format & Structure**, **Keywords & Content**, and **Clarity**.
   -  Get actionable, prioritized feedback with clear suggestions to fix issues and improve your score.
 
@@ -39,9 +45,12 @@
 ## 💻 Technology Stack
 
 - **Frontend:** React, TypeScript
-- **AI Integration:** Google Gemini API (`gemini-2.5-pro`) for all AI-powered analysis.
+- **AI Integration:** Google Gemini API (`gemini-2.5-flash`) for all AI-powered analysis.
 - **Styling:** Tailwind CSS
-- **Document Generation:** `docx` for Word exports & Browser Print API for PDF.
+- **Document Processing:**
+  - `docx` for generating Word exports.
+  - `mammoth.js` for robust text extraction from uploaded Word documents.
+  - Browser Print API for PDF generation.
 - **File Handling:** `file-saver`
 
 ---

@@ -1,11 +1,13 @@
+
 import React, { useState } from 'react';
 import Header from './components/Header';
 import ResumeBuilder from './components/ResumeBuilder';
 import ATSChecker from './components/ATSChecker';
 import JDMatcher from './components/JDMatcher';
+import ResumeRewriter from './components/ResumeRewriter';
 import { ResumeData } from './types';
 
-export type Module = 'builder' | 'ats' | 'jd';
+export type Module = 'builder' | 'ats' | 'jd' | 'rewriter';
 
 const App: React.FC = () => {
   const [activeModule, setActiveModule] = useState<Module>('builder');
@@ -65,6 +67,7 @@ const App: React.FC = () => {
         {activeModule === 'builder' && <ResumeBuilder onAnalyze={handleNavigateToChecker} />}
         {activeModule === 'ats' && <ATSChecker initialResumeText={resumeForAnalysis} />}
         {activeModule === 'jd' && <JDMatcher initialResumeText={resumeForAnalysis} />}
+        {activeModule === 'rewriter' && <ResumeRewriter initialResumeText={resumeForAnalysis} />}
       </main>
     </div>
   );
