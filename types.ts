@@ -124,3 +124,32 @@
           removed: string[];
       };
   }
+
+  export interface ResumeTemplateStyle {
+      layout: 'single-column' | 'two-column' | 'sidebar-left' | 'sidebar-right';
+      headerStyle: 'centered' | 'left-aligned' | 'banner' | 'minimal';
+      colorScheme: {
+          primary: string;
+          secondary: string;
+          accent: string;
+          background: string;
+          text: string;
+      };
+      fontStyle: {
+          headingFont: string;
+          bodyFont: string;
+          headingSize: 'small' | 'medium' | 'large';
+      };
+      sectionStyle: {
+          dividerType: 'line' | 'dots' | 'none' | 'thick-line';
+          bulletStyle: 'circle' | 'square' | 'dash' | 'arrow' | 'none';
+          sectionSpacing: 'compact' | 'normal' | 'spacious';
+      };
+      overallTheme: string; // e.g., "Modern Professional", "Classic Academic", "Creative Designer"
+      description: string; // AI-generated description of the template
+  }
+
+  export interface ParsedResumeWithTemplate {
+      resumeData: ResumeData;
+      templateStyle: ResumeTemplateStyle;
+  }

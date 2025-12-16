@@ -41,6 +41,16 @@
         font-family: 'Lora', serif;
       }
       @media print {
+        @page {
+          margin: 0;
+          size: A4;
+        }
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
         body * {
           visibility: hidden;
         }
@@ -52,25 +62,28 @@
           left: 0;
           top: 0;
           width: 100%;
+          margin: 0;
+          padding: 0.4in 0.5in;
+          box-sizing: border-box;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
         }
         .no-print {
-          display: none;
+          display: none !important;
+        }
+        /* Remove shadows and rounded corners from all elements when printing */
+        * {
+          box-shadow: none !important;
+        }
+        /* Ensure no stray borders from container */
+        .rounded-lg, .shadow-lg, .shadow-md {
+          box-shadow: none !important;
+          border: none !important;
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
-    "docx": "https://aistudiocdn.com/docx@^8.5.0",
-    "file-saver": "https://aistudiocdn.com/file-saver@^2.0.5",
-    "mammoth": "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/+esm"
-  }
-}
-</script>
+  <!-- Import map removed for local Vite development - modules resolved from node_modules -->
 
   <!-- SEO: JSON-LD Structured Data -->
   <script type="application/ld+json">

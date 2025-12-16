@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, ChangeEvent } from 'react';
-import { ResumeData, PersonalInfo, WorkExperience, Education, CategorizedSkill, Project, Certification } from '../types';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType, TabStopPosition, BorderStyle } from 'docx';
+import React, { useState, useEffect, ChangeEvent, useRef, DragEvent } from 'react';
+import { ResumeData, PersonalInfo, WorkExperience, Education, CategorizedSkill, Project, Certification, ResumeTemplateStyle } from '../types';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType, TabStopPosition, BorderStyle, ExternalHyperlink } from 'docx';
 import saveAs from 'file-saver';
-import { generateContentSuggestions } from '../services/geminiService';
+import { generateContentSuggestions, parseResumeWithTemplate } from '../services/geminiService';
 import Loader from './Loader';
 
 const initialResumeData: ResumeData = {
@@ -23,6 +23,30 @@ const initialResumeData: ResumeData = {
   certifications: [],
 };
 
+const defaultTemplateStyle: ResumeTemplateStyle = {
+  layout: 'single-column',
+  headerStyle: 'centered',
+  colorScheme: {
+    primary: '#000000',
+    secondary: '#000000',
+    accent: '#000000',
+    background: '#ffffff',
+    text: '#000000',
+  },
+  fontStyle: {
+    headingFont: 'Georgia',
+    bodyFont: 'system-ui',
+    headingSize: 'medium',
+  },
+  sectionStyle: {
+    dividerType: 'line',
+    bulletStyle: 'circle',
+    sectionSpacing: 'normal',
+  },
+  overallTheme: 'Default Professional',
+  description: 'A clean, professional single-column layout with black text and traditional serif headings.',
+};
+
 const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAnalyze}) => {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
@@ -33,6 +57,27 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiTarget, setAiTarget] = useState<{ type: 'summary' | 'experience'; id?: string } | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
+
+  // Template Upload State
+  const [templateStyle, setTemplateStyle] = useState<ResumeTemplateStyle>(defaultTemplateStyle);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Section Order State
+  type SectionKey = 'summary' | 'experience' | 'education' | 'projects' | 'certifications' | 'skills';
+  const defaultSectionOrder: SectionKey[] = ['summary', 'experience', 'education', 'projects', 'certifications', 'skills'];
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
+
+  const sectionLabels: Record<SectionKey, string> = {
+    summary: 'Summary',
+    experience: 'Experience',
+    education: 'Education',
+    projects: 'Projects',
+    certifications: 'Certifications',
+    skills: 'Skills'
+  };
 
   useEffect(() => {
     const savedData = localStorage.getItem('resumeData');
@@ -51,6 +96,139 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   useEffect(() => {
     localStorage.setItem('resumeData', JSON.stringify(resumeData));
   }, [resumeData]);
+
+  // Load saved template style from localStorage
+  useEffect(() => {
+    const savedTemplateStyle = localStorage.getItem('templateStyle');
+    const savedFileName = localStorage.getItem('uploadedFileName');
+    if (savedTemplateStyle) {
+      try {
+        setTemplateStyle(JSON.parse(savedTemplateStyle));
+        if (savedFileName) setUploadedFileName(savedFileName);
+      } catch (e) {
+        console.error("Could not parse template style from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Save template style to localStorage
+  useEffect(() => {
+    localStorage.setItem('templateStyle', JSON.stringify(templateStyle));
+    if (uploadedFileName) {
+      localStorage.setItem('uploadedFileName', uploadedFileName);
+    }
+  }, [templateStyle, uploadedFileName]);
+
+  // Load section order from localStorage
+  useEffect(() => {
+    const savedSectionOrder = localStorage.getItem('sectionOrder');
+    if (savedSectionOrder) {
+      try {
+        setSectionOrder(JSON.parse(savedSectionOrder));
+      } catch (e) {
+        console.error("Could not parse section order from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Save section order to localStorage
+  useEffect(() => {
+    localStorage.setItem('sectionOrder', JSON.stringify(sectionOrder));
+  }, [sectionOrder]);
+
+  // Section reordering functions
+  const moveSectionUp = (index: number) => {
+    if (index === 0) return;
+    const newOrder = [...sectionOrder];
+    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+    setSectionOrder(newOrder);
+  };
+
+  const moveSectionDown = (index: number) => {
+    if (index === sectionOrder.length - 1) return;
+    const newOrder = [...sectionOrder];
+    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+    setSectionOrder(newOrder);
+  };
+
+  const resetSectionOrder = () => {
+    setSectionOrder(defaultSectionOrder);
+  };
+
+  // File upload handlers
+  const handleFileUpload = async (file: File) => {
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/png', 'image/jpeg'];
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a PDF, Word document (.docx), or image file (PNG/JPEG).');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadedFileName(file.name);
+
+    try {
+      const base64Data = await fileToBase64(file);
+      const result = await parseResumeWithTemplate({
+        data: base64Data,
+        mimeType: file.type
+      });
+
+      setResumeData(result.resumeData);
+      setTemplateStyle(result.templateStyle);
+    } catch (error) {
+      console.error('Error parsing resume:', error);
+      alert('Error parsing resume. Please try again or enter information manually.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix to get just the base64 string
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  };
+
+  const handleResetTemplate = () => {
+    setTemplateStyle(defaultTemplateStyle);
+    setUploadedFileName(null);
+    localStorage.removeItem('uploadedFileName');
+  };
 
   const handlePersonalInfoChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -133,138 +311,198 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   const handleExportWord = () => {
     const { personalInfo, summary, experience, education, projects, certifications, skills } = resumeData;
 
+    // Convert hex color to Word format (remove #)
+    const hexToWordColor = (hex: string): string => hex.replace('#', '');
+    const primaryColor = hexToWordColor(templateStyle.colorScheme.primary);
+    const secondaryColor = hexToWordColor(templateStyle.colorScheme.secondary);
+    
+    // Determine heading size based on template
+    const getHeadingFontSize = (): number => {
+      switch (templateStyle.fontStyle.headingSize) {
+        case 'small': return 22;
+        case 'medium': return 24;
+        case 'large': return 28;
+        default: return 24;
+      }
+    };
+
+    // Determine border style based on template
+    const getBorderStyleForSection = () => {
+      switch (templateStyle.sectionStyle.dividerType) {
+        case 'line': return BorderStyle.SINGLE;
+        case 'thick-line': return BorderStyle.THICK;
+        case 'dots': return BorderStyle.DOTTED;
+        case 'none': return BorderStyle.NONE;
+        default: return BorderStyle.SINGLE;
+      }
+    };
+
     const createSectionTitle = (text: string) => {
       return new Paragraph({
-        children: [new TextRun({ text: text.toUpperCase(), bold: true, color: "1155cc", size: 24 })],
-        border: {
-          bottom: { color: "auto", space: 1, style: BorderStyle.SINGLE, size: 6 },
-        },
-        spacing: { after: 200 },
+        children: [new TextRun({ text: text.toUpperCase(), bold: true, color: primaryColor, size: getHeadingFontSize() })],
+        border: templateStyle.sectionStyle.dividerType !== 'none' ? {
+          bottom: { color: primaryColor, space: 1, style: getBorderStyleForSection(), size: templateStyle.sectionStyle.dividerType === 'thick-line' ? 12 : 6 },
+        } : undefined,
+        spacing: { after: templateStyle.sectionStyle.sectionSpacing === 'compact' ? 100 : templateStyle.sectionStyle.sectionSpacing === 'spacious' ? 300 : 200 },
       });
     };
+
+    const headerAlignment = templateStyle.headerStyle === 'centered' || templateStyle.headerStyle === 'banner' 
+      ? AlignmentType.CENTER 
+      : AlignmentType.LEFT;
     
     const docChildren: Paragraph[] = [
       // Personal Info
       new Paragraph({
-        children: [new TextRun({ text: personalInfo.name, bold: true, size: 52 })],
-        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: personalInfo.name, bold: true, size: 52, color: primaryColor })],
+        alignment: headerAlignment,
       }),
       new Paragraph({
-        text: [ personalInfo.location, personalInfo.phone, personalInfo.email ].filter(Boolean).join(' | '),
-        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: [ personalInfo.location, personalInfo.phone, personalInfo.email ].filter(Boolean).join(' | '), color: secondaryColor })],
+        alignment: headerAlignment,
       }),
       new Paragraph({
-        text: [
-            personalInfo.linkedin ? `LinkedIn: ${personalInfo.linkedin}` : null,
-            personalInfo.portfolio ? `Portfolio: ${personalInfo.portfolio}` : null
-        ].filter(Boolean).join(' | '),
-        alignment: AlignmentType.CENTER,
+        children: [
+          ...(personalInfo.linkedin ? [
+            new ExternalHyperlink({
+              children: [new TextRun({ text: 'LinkedIn', color: '0000FF', underline: {} })],
+              link: personalInfo.linkedin,
+            }),
+          ] : []),
+          ...(personalInfo.linkedin && personalInfo.portfolio ? [new TextRun({ text: ' | ' })] : []),
+          ...(personalInfo.portfolio ? [
+            new ExternalHyperlink({
+              children: [new TextRun({ text: 'Portfolio', color: '0000FF', underline: {} })],
+              link: personalInfo.portfolio,
+            }),
+          ] : []),
+        ],
+        alignment: headerAlignment,
         spacing: { after: 400 },
       }),
     ];
     
-    // Summary
-    if (summary) {
+    // Helper functions for each section
+    const addSummarySection = () => {
+      if (summary) {
         docChildren.push(createSectionTitle('Summary'));
         docChildren.push(new Paragraph({ text: summary, spacing: { after: 200 } }));
-    }
+      }
+    };
 
-    // Experience
-    if (experience.length > 0) {
+    const addExperienceSection = () => {
+      if (experience.length > 0) {
         docChildren.push(createSectionTitle('Experience'));
         experience.forEach(exp => {
-            docChildren.push(new Paragraph({
-                children: [
-                    new TextRun({ text: `${exp.role} | `, bold: true, size: 22 }),
-                    new TextRun({ text: `${exp.company}, ${exp.location}`, size: 22 }),
-                    new TextRun({ text: `\t${exp.startDate} – ${exp.endDate}` }),
-                ],
-                tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-            }));
-            exp.description.split('\n').filter(line => line.trim()).forEach(line => {
-                docChildren.push(new Paragraph({
-                    text: line.replace(/^- /, '').trim(),
-                    bullet: { level: 0 },
-                    indent: { left: 720 },
-                    spacing: { before: 100 },
-                }));
-            });
-            docChildren.push(new Paragraph("")); // Spacer
-        });
-    }
-    
-    // Education
-    if (education.length > 0) {
-        docChildren.push(createSectionTitle('Education'));
-        education.forEach(edu => {
-            docChildren.push(new Paragraph({
-                children: [
-                    new TextRun({ text: `${edu.institution}, ${edu.location}`, bold: true, size: 22 }),
-                    new TextRun({ text: `\t${edu.startDate} – ${edu.endDate}` }),
-                ],
-                tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-            }));
-            docChildren.push(new Paragraph({
-                children: [
-                    new TextRun({ text: edu.degree }),
-                    ...(edu.gpa ? [new TextRun({ text: `\tCGPA: ${edu.gpa}` })] : []),
-                ],
-                 tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-            }));
-            docChildren.push(new Paragraph(""));
-        });
-    }
-
-    // Projects
-    if (projects.length > 0) {
-        docChildren.push(createSectionTitle('Projects'));
-        projects.forEach(proj => {
-           docChildren.push(new Paragraph({
+          docChildren.push(new Paragraph({
             children: [
-              new TextRun({ text: `${proj.title} | `, bold: true, size: 22 }),
-              new TextRun({ text: proj.technologies, size: 20 }),
-              new TextRun({ text: `\t${proj.startDate} – ${proj.endDate}` }),
+              new TextRun({ text: `${exp.role} | `, bold: true, size: 22 }),
+              new TextRun({ text: `${exp.company}, ${exp.location}`, size: 22, color: secondaryColor }),
+              new TextRun({ text: `\t${exp.startDate} – ${exp.endDate}`, color: secondaryColor }),
             ],
             tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-           }));
-           proj.description.split('\n').filter(line => line.trim()).forEach(line => {
-                docChildren.push(new Paragraph({
-                    text: line.replace(/^- /, '').trim(),
-                    bullet: { level: 0 },
-                    indent: { left: 720 },
-                    spacing: { before: 100 },
-                }));
-            });
-            docChildren.push(new Paragraph(""));
+          }));
+          exp.description.split('\n').filter(line => line.trim()).forEach(line => {
+            docChildren.push(new Paragraph({
+              text: line.replace(/^- /, '').trim(),
+              bullet: { level: 0 },
+              indent: { left: 720 },
+              spacing: { before: 100 },
+            }));
+          });
+          docChildren.push(new Paragraph(""));
         });
-    }
+      }
+    };
 
-    // Certifications
-    if (certifications.length > 0) {
+    const addEducationSection = () => {
+      if (education.length > 0) {
+        docChildren.push(createSectionTitle('Education'));
+        education.forEach(edu => {
+          docChildren.push(new Paragraph({
+            children: [
+              new TextRun({ text: `${edu.institution}, ${edu.location}`, bold: true, size: 22 }),
+              new TextRun({ text: `\t${edu.startDate} – ${edu.endDate}`, color: secondaryColor }),
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+          }));
+          docChildren.push(new Paragraph({
+            children: [
+              new TextRun({ text: edu.degree }),
+              ...(edu.gpa ? [new TextRun({ text: `\tCGPA: ${edu.gpa}`, color: secondaryColor })] : []),
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+          }));
+          docChildren.push(new Paragraph(""));
+        });
+      }
+    };
+
+    const addProjectsSection = () => {
+      if (projects.length > 0) {
+        docChildren.push(createSectionTitle('Projects'));
+        projects.forEach(proj => {
+          docChildren.push(new Paragraph({
+            children: [
+              new TextRun({ text: `${proj.title} | `, bold: true, size: 22 }),
+              new TextRun({ text: proj.technologies, size: 20, italics: true, color: primaryColor }),
+              new TextRun({ text: `\t${proj.startDate} – ${proj.endDate}`, color: secondaryColor }),
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+          }));
+          proj.description.split('\n').filter(line => line.trim()).forEach(line => {
+            docChildren.push(new Paragraph({
+              text: line.replace(/^- /, '').trim(),
+              bullet: { level: 0 },
+              indent: { left: 720 },
+              spacing: { before: 100 },
+            }));
+          });
+          docChildren.push(new Paragraph(""));
+        });
+      }
+    };
+
+    const addCertificationsSection = () => {
+      if (certifications.length > 0) {
         docChildren.push(createSectionTitle('Certifications'));
         certifications.forEach(cert => {
-            docChildren.push(new Paragraph({
-                children: [
-                    new TextRun({ text: `${cert.name} - `, bold: true, size: 22 }),
-                    new TextRun({ text: cert.issuer, size: 22 }),
-                    new TextRun({ text: `\t${cert.date}` }),
-                ],
-                tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
-            }));
+          docChildren.push(new Paragraph({
+            children: [
+              new TextRun({ text: `${cert.name} - `, bold: true, size: 22 }),
+              new TextRun({ text: cert.issuer, size: 22 }),
+              new TextRun({ text: `\t${cert.date}`, color: secondaryColor }),
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+          }));
         });
         docChildren.push(new Paragraph(""));
-    }
+      }
+    };
 
-    // Skills
-    if (skills.length > 0) {
+    const addSkillsSection = () => {
+      if (skills.length > 0) {
         docChildren.push(createSectionTitle('Skills'));
         skills.forEach(skill => docChildren.push(new Paragraph({
           children: [
-            new TextRun({ text: `${skill.category}: `, bold: true, size: 22 }),
+            new TextRun({ text: `${skill.category}: `, bold: true, size: 22, color: secondaryColor }),
             new TextRun({ text: skill.skills, size: 22 }),
           ],
         })));
-    }
+      }
+    };
+
+    // Add sections in dynamic order
+    sectionOrder.forEach(section => {
+      switch (section) {
+        case 'summary': addSummarySection(); break;
+        case 'experience': addExperienceSection(); break;
+        case 'education': addEducationSection(); break;
+        case 'projects': addProjectsSection(); break;
+        case 'certifications': addCertificationsSection(); break;
+        case 'skills': addSkillsSection(); break;
+      }
+    });
 
 
     const doc = new Document({
@@ -294,85 +532,341 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
       );
   };
   
-  const ResumePreview = () => (
-    <div className="p-4">
-        <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 font-serif">{resumeData.personalInfo.name}</h1>
-            <p className="text-sm text-gray-600 mt-2">
-                {
-                    [
-                        resumeData.personalInfo.location,
-                        resumeData.personalInfo.phone,
-                        resumeData.personalInfo.email,
-                        resumeData.personalInfo.linkedin ? `LinkedIn` : null,
-                        resumeData.personalInfo.portfolio ? `Portfolio` : null
-                    ].filter(Boolean).map((item, index, arr) => (
-                        <React.Fragment key={index}>
-                            {item.startsWith('LinkedIn') ? <a href={resumeData.personalInfo.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{item}</a> : item.startsWith('Portfolio') ? <a href={resumeData.personalInfo.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{item}</a> : item}
-                            {index < arr.length - 1 ? ' | ' : ''}
-                        </React.Fragment>
-                    ))
-                }
+  // Get dynamic styles based on template
+  const getHeaderAlignment = () => {
+    switch (templateStyle.headerStyle) {
+      case 'centered': return 'text-center';
+      case 'left-aligned': return 'text-left';
+      case 'banner': return 'text-center py-4';
+      case 'minimal': return 'text-left';
+      default: return 'text-center';
+    }
+  };
+
+  const getHeadingSize = () => {
+    switch (templateStyle.fontStyle.headingSize) {
+      case 'small': return 'text-lg';
+      case 'medium': return 'text-xl';
+      case 'large': return 'text-2xl';
+      default: return 'text-xl';
+    }
+  };
+
+  const getSectionSpacing = () => {
+    switch (templateStyle.sectionStyle.sectionSpacing) {
+      case 'compact': return 'mb-4';
+      case 'normal': return 'mb-6';
+      case 'spacious': return 'mb-8';
+      default: return 'mb-6';
+    }
+  };
+
+  const getBulletStyle = () => {
+    switch (templateStyle.sectionStyle.bulletStyle) {
+      case 'circle': return 'list-disc';
+      case 'square': return 'list-[square]';
+      case 'dash': return 'list-["-_"]';
+      case 'arrow': return 'list-["→_"]';
+      case 'none': return 'list-none';
+      default: return 'list-disc';
+    }
+  };
+
+  const getDividerStyle = () => {
+    switch (templateStyle.sectionStyle.dividerType) {
+      case 'line': return 'border-b-2';
+      case 'thick-line': return 'border-b-4';
+      case 'dots': return 'border-b-2 border-dotted';
+      case 'none': return '';
+      default: return 'border-b-2';
+    }
+  };
+
+  const ResumePreview = () => {
+    const isTwoColumn = templateStyle.layout === 'two-column' || templateStyle.layout === 'sidebar-left' || templateStyle.layout === 'sidebar-right';
+    
+    const customStyles = {
+      '--primary-color': templateStyle.colorScheme.primary,
+      '--secondary-color': templateStyle.colorScheme.secondary,
+      '--accent-color': templateStyle.colorScheme.accent,
+      '--bg-color': templateStyle.colorScheme.background,
+      '--text-color': templateStyle.colorScheme.text,
+    } as React.CSSProperties;
+
+    const renderTemplateSection = (title: string, data: any, renderItem: (item: any, index: number) => React.ReactNode) => {
+      if (!data || (Array.isArray(data) && data.length === 0) || (typeof data === 'string' && data.trim() === '')) {
+        return null;
+      }
+      return (
+        <section className={getSectionSpacing()}>
+          <h2 
+            className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
+            style={{ 
+              color: templateStyle.colorScheme.primary,
+              borderColor: templateStyle.colorScheme.accent,
+              fontFamily: templateStyle.fontStyle.headingFont
+            }}
+          >
+            {title}
+          </h2>
+          {Array.isArray(data) ? data.map(renderItem) : <p className="whitespace-pre-wrap" style={{ color: templateStyle.colorScheme.text }}>{data}</p>}
+        </section>
+      );
+    };
+
+    // Two-column layout for sidebar templates
+    if (isTwoColumn) {
+      const isLeftSidebar = templateStyle.layout === 'sidebar-left';
+      
+      const sidebarContent = (
+        <div className="space-y-6">
+          {/* Skills in sidebar */}
+          {resumeData.skills.length > 0 && (
+            <section>
+              <h2 
+                className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
+                style={{ color: templateStyle.colorScheme.primary, borderColor: templateStyle.colorScheme.accent, fontFamily: templateStyle.fontStyle.headingFont }}
+              >
+                Skills
+              </h2>
+              {resumeData.skills.map((skill: CategorizedSkill) => (
+                <div key={skill.id} className="mb-2">
+                  <strong className="text-sm" style={{ color: templateStyle.colorScheme.secondary }}>{skill.category}</strong>
+                  <p className="text-sm" style={{ color: templateStyle.colorScheme.text }}>{skill.skills}</p>
+                </div>
+              ))}
+            </section>
+          )}
+          
+          {/* Certifications in sidebar */}
+          {resumeData.certifications.length > 0 && (
+            <section>
+              <h2 
+                className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
+                style={{ color: templateStyle.colorScheme.primary, borderColor: templateStyle.colorScheme.accent, fontFamily: templateStyle.fontStyle.headingFont }}
+              >
+                Certifications
+              </h2>
+              {resumeData.certifications.map((cert: Certification) => (
+                <div key={cert.id} className="mb-2">
+                  <p className="font-medium text-sm" style={{ color: templateStyle.colorScheme.text }}>{cert.name}</p>
+                  <p className="text-xs" style={{ color: templateStyle.colorScheme.secondary }}>{cert.issuer} • {cert.date}</p>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {/* Education in sidebar for compact layouts */}
+          {resumeData.education.length > 0 && (
+            <section>
+              <h2 
+                className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
+                style={{ color: templateStyle.colorScheme.primary, borderColor: templateStyle.colorScheme.accent, fontFamily: templateStyle.fontStyle.headingFont }}
+              >
+                Education
+              </h2>
+              {resumeData.education.map((edu: Education) => (
+                <div key={edu.id} className="mb-3">
+                  <p className="font-medium text-sm" style={{ color: templateStyle.colorScheme.text }}>{edu.degree}</p>
+                  <p className="text-xs" style={{ color: templateStyle.colorScheme.secondary }}>{edu.institution}</p>
+                  <p className="text-xs" style={{ color: templateStyle.colorScheme.secondary }}>{edu.startDate} – {edu.endDate}</p>
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+      );
+
+      const mainContent = (
+        <div>
+          {/* Summary */}
+          {resumeData.summary && renderTemplateSection('Summary', resumeData.summary, () => <></>)}
+          
+          {/* Experience */}
+          {renderTemplateSection('Experience', resumeData.experience, (exp: WorkExperience) => (
+            <div key={exp.id} className="mb-4">
+              <div className="flex justify-between items-start flex-wrap">
+                <h3 className="font-bold" style={{ color: templateStyle.colorScheme.text }}>{exp.role}</h3>
+                <p className="text-sm whitespace-nowrap" style={{ color: templateStyle.colorScheme.secondary }}>{exp.startDate} – {exp.endDate}</p>
+              </div>
+              <p className="text-sm" style={{ color: templateStyle.colorScheme.secondary }}>{exp.company}, {exp.location}</p>
+              <ul className={`${getBulletStyle()} list-inside mt-1 text-sm`} style={{ color: templateStyle.colorScheme.text }}>
+                {exp.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
+              </ul>
+            </div>
+          ))}
+          
+          {/* Projects */}
+          {renderTemplateSection('Projects', resumeData.projects, (proj: Project) => (
+            <div key={proj.id} className="mb-4">
+              <div className="flex justify-between items-start flex-wrap">
+                <h3 className="font-bold" style={{ color: templateStyle.colorScheme.text }}>{proj.title}</h3>
+                <p className="text-sm whitespace-nowrap" style={{ color: templateStyle.colorScheme.secondary }}>{proj.startDate} – {proj.endDate}</p>
+              </div>
+              <p className="text-sm italic" style={{ color: templateStyle.colorScheme.accent }}>{proj.technologies}</p>
+              <ul className={`${getBulletStyle()} list-inside mt-1 text-sm`} style={{ color: templateStyle.colorScheme.text }}>
+                {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      );
+
+      return (
+        <div className="p-4" style={{ ...customStyles, backgroundColor: templateStyle.colorScheme.background }}>
+          {/* Header */}
+          <header className={`${getHeaderAlignment()} mb-6 pb-4`} style={{ borderBottomColor: templateStyle.colorScheme.accent, borderBottomWidth: templateStyle.headerStyle === 'banner' ? '3px' : '0' }}>
+            <h1 
+              className="text-3xl font-bold"
+              style={{ color: templateStyle.colorScheme.primary, fontFamily: templateStyle.fontStyle.headingFont }}
+            >
+              {resumeData.personalInfo.name}
+            </h1>
+            <p className="text-sm mt-2" style={{ color: templateStyle.colorScheme.secondary }}>
+              {[resumeData.personalInfo.location, resumeData.personalInfo.phone, resumeData.personalInfo.email].filter(Boolean).join(' • ')}
             </p>
+            <p className="text-sm" style={{ color: templateStyle.colorScheme.accent }}>
+              {resumeData.personalInfo.linkedin && <a href={resumeData.personalInfo.linkedin} className="hover:underline mr-3">LinkedIn</a>}
+              {resumeData.personalInfo.portfolio && <a href={resumeData.personalInfo.portfolio} className="hover:underline">Portfolio</a>}
+            </p>
+          </header>
+
+          <div className="flex gap-6">
+            {isLeftSidebar && <div className="w-1/3 pr-4 border-r" style={{ borderColor: templateStyle.colorScheme.accent }}>{sidebarContent}</div>}
+            <div className={isLeftSidebar ? 'w-2/3 pl-4' : 'w-2/3 pr-4'}>{mainContent}</div>
+            {!isLeftSidebar && <div className="w-1/3 pl-4 border-l" style={{ borderColor: templateStyle.colorScheme.accent }}>{sidebarContent}</div>}
+          </div>
+        </div>
+      );
+    }
+
+    // Single column layout (default)
+    return (
+      <div className="p-4" style={{ ...customStyles, backgroundColor: templateStyle.colorScheme.background, fontFamily: templateStyle.fontStyle.bodyFont }}>
+        <header className={`${getHeaderAlignment()} mb-8 ${templateStyle.headerStyle === 'banner' ? 'py-4 px-6 rounded-lg' : ''}`} 
+          style={templateStyle.headerStyle === 'banner' ? { backgroundColor: templateStyle.colorScheme.primary } : {}}>
+          <h1 
+            className="text-4xl font-bold"
+            style={{ 
+              color: templateStyle.headerStyle === 'banner' ? '#ffffff' : templateStyle.colorScheme.primary,
+              fontFamily: templateStyle.fontStyle.headingFont 
+            }}
+          >
+            {resumeData.personalInfo.name}
+          </h1>
+          <p className="text-sm mt-2" style={{ color: templateStyle.headerStyle === 'banner' ? 'rgba(255,255,255,0.9)' : templateStyle.colorScheme.secondary }}>
+            {
+              [
+                resumeData.personalInfo.location,
+                resumeData.personalInfo.phone,
+                resumeData.personalInfo.email,
+                resumeData.personalInfo.linkedin ? 'LinkedIn' : null,
+                resumeData.personalInfo.portfolio ? 'Portfolio' : null
+              ].filter(Boolean).map((item, index, arr) => (
+                <React.Fragment key={index}>
+                  {item === 'LinkedIn' ? <a href={resumeData.personalInfo.linkedin} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: templateStyle.headerStyle === 'banner' ? '#ffffff' : templateStyle.colorScheme.accent }}>{item}</a> 
+                   : item === 'Portfolio' ? <a href={resumeData.personalInfo.portfolio} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: templateStyle.headerStyle === 'banner' ? '#ffffff' : templateStyle.colorScheme.accent }}>{item}</a> 
+                   : item}
+                  {index < arr.length - 1 ? ' | ' : ''}
+                </React.Fragment>
+              ))
+            }
+          </p>
         </header>
 
-        {renderSection('Summary', resumeData.summary, () => <></>)}
-        
-        {renderSection('Experience', resumeData.experience, (exp: WorkExperience) => (
-            <div key={exp.id} className="mb-4">
-                <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-gray-800">{exp.role} | <span className="font-semibold">{exp.company}, {exp.location}</span></h3>
-                    <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{exp.startDate} – {exp.endDate}</p>
-                </div>
-                <ul className="list-disc list-inside mt-1 text-gray-700 whitespace-pre-wrap">
-                    {exp.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
-                </ul>
-            </div>
-        ))}
-        
-        {renderSection('Education', resumeData.education, (edu: Education) => (
-            <div key={edu.id} className="mb-2">
-                 <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-gray-800">{edu.institution}, {edu.location}</h3>
-                    <p className="text-sm text-gray-600 font-medium">{edu.startDate} – {edu.endDate}</p>
-                </div>
-                <div className="flex justify-between items-start">
-                   <p className="text-md text-gray-700">{edu.degree}</p>
-                   {edu.gpa && <p className="text-sm text-gray-600">CGPA: {edu.gpa}</p>}
-                </div>
-            </div>
-        ))}
-
-        {renderSection('Projects', resumeData.projects, (proj: Project) => (
-             <div key={proj.id} className="mb-4">
-                <div className="flex justify-between items-start">
-                     <h3 className="font-bold text-lg text-gray-800">{proj.title} | <span className="font-semibold text-sm">{proj.technologies}</span></h3>
-                     <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{proj.startDate} – {proj.endDate}</p>
-                </div>
-                 <ul className="list-disc list-inside mt-1 text-gray-700 whitespace-pre-wrap">
-                    {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
-                </ul>
-            </div>
-        ))}
-
-        {renderSection('Certifications', resumeData.certifications, (cert: Certification) => (
-            <div key={cert.id} className="mb-2">
-                <div className="flex justify-between items-start">
-                   <h3 className="font-bold text-lg text-gray-800">{cert.name} - <span className="font-semibold">{cert.issuer}</span></h3>
-                   <p className="text-sm text-gray-600 font-medium">{cert.date}</p>
-               </div>
-            </div>
-        ))}
-
-        {renderSection('Skills', resumeData.skills, (skill: CategorizedSkill) => (
-            <div key={skill.id} className="text-gray-700 mb-1 flex">
-                <strong className="font-semibold w-48 flex-shrink-0">{skill.category}:</strong>
-                <span>{skill.skills}</span>
-            </div>
-        ))}
-
-    </div>
-  );
+        {/* Render sections in dynamic order */}
+        {sectionOrder.map((section) => {
+          switch (section) {
+            case 'summary':
+              return resumeData.summary ? (
+                <React.Fragment key="summary">
+                  {renderTemplateSection('Summary', resumeData.summary, () => <></>)}
+                </React.Fragment>
+              ) : null;
+            case 'experience':
+              return (
+                <React.Fragment key="experience">
+                  {renderTemplateSection('Experience', resumeData.experience, (exp: WorkExperience) => (
+                    <div key={exp.id} className="mb-4">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-lg" style={{ color: templateStyle.colorScheme.text }}>
+                          {exp.role} | <span className="font-semibold">{exp.company}, {exp.location}</span>
+                        </h3>
+                        <p className="text-sm font-medium whitespace-nowrap" style={{ color: templateStyle.colorScheme.secondary }}>{exp.startDate} – {exp.endDate}</p>
+                      </div>
+                      <ul className={`${getBulletStyle()} list-inside mt-1 whitespace-pre-wrap`} style={{ color: templateStyle.colorScheme.text }}>
+                        {exp.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </React.Fragment>
+              );
+            case 'education':
+              return (
+                <React.Fragment key="education">
+                  {renderTemplateSection('Education', resumeData.education, (edu: Education) => (
+                    <div key={edu.id} className="mb-2">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-lg" style={{ color: templateStyle.colorScheme.text }}>{edu.institution}, {edu.location}</h3>
+                        <p className="text-sm font-medium" style={{ color: templateStyle.colorScheme.secondary }}>{edu.startDate} – {edu.endDate}</p>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <p style={{ color: templateStyle.colorScheme.text }}>{edu.degree}</p>
+                        {edu.gpa && <p className="text-sm" style={{ color: templateStyle.colorScheme.secondary }}>CGPA: {edu.gpa}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </React.Fragment>
+              );
+            case 'projects':
+              return (
+                <React.Fragment key="projects">
+                  {renderTemplateSection('Projects', resumeData.projects, (proj: Project) => (
+                    <div key={proj.id} className="mb-4">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-lg" style={{ color: templateStyle.colorScheme.text }}>
+                          {proj.title} | <span className="font-semibold text-sm" style={{ color: templateStyle.colorScheme.accent }}>{proj.technologies}</span>
+                        </h3>
+                        <p className="text-sm font-medium whitespace-nowrap" style={{ color: templateStyle.colorScheme.secondary }}>{proj.startDate} – {proj.endDate}</p>
+                      </div>
+                      <ul className={`${getBulletStyle()} list-inside mt-1 whitespace-pre-wrap`} style={{ color: templateStyle.colorScheme.text }}>
+                        {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </React.Fragment>
+              );
+            case 'certifications':
+              return (
+                <React.Fragment key="certifications">
+                  {renderTemplateSection('Certifications', resumeData.certifications, (cert: Certification) => (
+                    <div key={cert.id} className="mb-2">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-lg" style={{ color: templateStyle.colorScheme.text }}>{cert.name} - <span className="font-semibold">{cert.issuer}</span></h3>
+                        <p className="text-sm font-medium" style={{ color: templateStyle.colorScheme.secondary }}>{cert.date}</p>
+                      </div>
+                    </div>
+                  ))}
+                </React.Fragment>
+              );
+            case 'skills':
+              return (
+                <React.Fragment key="skills">
+                  {renderTemplateSection('Skills', resumeData.skills, (skill: CategorizedSkill) => (
+                    <div key={skill.id} className="mb-1 flex" style={{ color: templateStyle.colorScheme.text }}>
+                      <strong className="font-semibold w-48 flex-shrink-0" style={{ color: templateStyle.colorScheme.secondary }}>{skill.category}:</strong>
+                      <span>{skill.skills}</span>
+                    </div>
+                  ))}
+                </React.Fragment>
+              );
+            default:
+              return null;
+          }
+        })}
+      </div>
+    );
+  };
 
 
   return (
@@ -470,8 +964,95 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Form Section */}
-        <div className="bg-white p-6 rounded-lg shadow-md no-print max-h-[85vh] overflow-y-auto">
+        <div className="bg-white p-6 rounded-lg shadow-md no-print max-h-[109vh] overflow-y-auto">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">Resume Content</h2>
+          
+          {/* Resume Upload Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Import Resume
+              </h3>
+              {uploadedFileName && (
+                <button
+                  onClick={handleResetTemplate}
+                  className="text-sm text-red-500 hover:text-red-700 flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Reset to Default
+                </button>
+              )}
+            </div>
+            
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                isDragging 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : uploadedFileName 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,image/png,image/jpeg"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+              
+              {isUploading ? (
+                <div className="flex flex-col items-center py-4">
+                  <Loader />
+                  <p className="mt-3 text-sm text-gray-600">Analyzing resume and detecting template...</p>
+                </div>
+              ) : uploadedFileName ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="font-medium text-green-700">{uploadedFileName}</p>
+                  <p className="text-sm text-gray-500 mt-1">Template: {templateStyle.overallTheme}</p>
+                  <p className="text-xs text-gray-400 mt-2">Click to upload a different resume</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="font-medium text-gray-700">Drop your resume here or click to browse</p>
+                  <p className="text-sm text-gray-500 mt-1">Supports PDF, Word (.docx), PNG, JPEG</p>
+                  <p className="text-xs text-gray-400 mt-2">Your resume template will be preserved for export</p>
+                </div>
+              )}
+            </div>
+            
+            {uploadedFileName && (
+              <div className="mt-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+                <p className="text-xs text-indigo-700 flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: templateStyle.colorScheme.primary }}></span>
+                  Template preserved: <strong>{templateStyle.overallTheme}</strong> — {templateStyle.layout} layout
+                </p>
+                <p className="text-[10px] text-indigo-500 mt-1">Your exported resume will match the original template style</p>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-200 my-6"></div>
+
           {/* Personal Info */}
           <div className="mb-6">
             <h3 className="text-xl font-semibold mb-3">Personal Information</h3>
@@ -484,6 +1065,58 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               <input name="portfolio" value={resumeData.personalInfo.portfolio} onChange={handlePersonalInfoChange} placeholder="Portfolio URL" className={inputClasses} />
             </div>
           </div>
+
+          {/* Section Order Control */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Section Order
+              </h3>
+              <button
+                onClick={resetSectionOrder}
+                className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="space-y-1">
+              {sectionOrder.map((section, index) => (
+                <div key={section} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200 hover:border-gray-300 transition-colors">
+                  <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-4">{index + 1}.</span>
+                    {sectionLabels[section]}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => moveSectionUp(index)}
+                      disabled={index === 0}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Move up"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => moveSectionDown(index)}
+                      disabled={index === sectionOrder.length - 1}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Move down"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Use arrows to reorder sections. Changes reflect in preview instantly.</p>
+          </div>
+
           {/* Summary */}
           <div className="mb-6">
             <div className="flex justify-between items-end mb-3">
@@ -576,7 +1209,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
             <button onClick={() => handleAddItem<Certification>('certifications', {id: `cert${Date.now()}`, name: '', issuer: '', date: ''})} className="text-blue-600 font-medium">+ Add Certification</button>
           </div>
           {/* Skills */}
-          <div className="mb-6">
+          <div className="mb-auto">
             <h3 className="text-xl font-semibold mb-3">Skills</h3>
             {resumeData.skills.map(skill => (
               <div key={skill.id} className={itemContainerClasses}>
@@ -591,7 +1224,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
         {/* Preview and Controls Section */}
         <div>
           <div className="bg-white p-6 rounded-lg shadow-md mb-8 no-print">
-              <h2 className="text-2xl font-bold mb-6 text-gray-800">Preview & Export</h2>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Preview & Export</h2>
+              
+
               <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm">Export as PDF</button>
