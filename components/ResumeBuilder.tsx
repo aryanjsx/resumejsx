@@ -724,7 +724,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
       );
 
       return (
-        <div className="p-4" style={{ ...customStyles, backgroundColor: colors.background }}>
+        <div className="p-8" style={{ ...customStyles, backgroundColor: colors.background }}>
           {/* Header */}
           <header className={`${getHeaderAlignment()} mb-6 pb-4`} style={{ borderBottomColor: colors.accent, borderBottomWidth: templateStyle.headerStyle === 'banner' ? '3px' : '0' }}>
             <h1 
@@ -753,7 +753,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
     // Single column layout (default)
     return (
-      <div className="p-4" style={{ ...customStyles, backgroundColor: colors.background, fontFamily: templateStyle.fontStyle.bodyFont }}>
+      <div className="p-8" style={{ ...customStyles, backgroundColor: colors.background, fontFamily: templateStyle.fontStyle.bodyFont }}>
         <header className={`${getHeaderAlignment()} mb-8 ${templateStyle.headerStyle === 'banner' ? 'py-4 px-6 rounded-lg' : ''}`} 
           style={templateStyle.headerStyle === 'banner' ? { backgroundColor: colors.primary } : {}}>
           <h1 
@@ -1251,7 +1251,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                   <button onClick={() => onAnalyze(resumeData)} className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">Check ATS Score</button>
               </div>
           </div>
-          <div id="print-area" className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg transition-colors duration-200">
+          <div id="print-area" className="rounded-lg shadow-lg overflow-hidden">
             <ResumePreview />
           </div>
         </div>

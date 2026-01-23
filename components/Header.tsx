@@ -53,21 +53,26 @@ const ThemeToggle: React.FC = () => {
 const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule }) => {
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm dark:shadow-gray-900/50 sticky top-0 z-10 transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="relative flex items-center justify-between py-4">
+          {/* Logo - Left */}
           <div className="flex items-center space-x-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm2 0v12h2V4H6zm5 0v12h2V4h-2z" clipRule="evenodd" />
             </svg>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white">AI Resume Architect</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white hidden sm:block">AI Resume Architect</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <nav className="flex items-center space-x-1 md:space-x-2 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-x-auto">
-              <NavItem label="Builder" isActive={activeModule === 'builder'} onClick={() => setActiveModule('builder')} />
-              <NavItem label="ATS Checker" isActive={activeModule === 'ats'} onClick={() => setActiveModule('ats')} />
-              <NavItem label="JD Matcher" isActive={activeModule === 'jd'} onClick={() => setActiveModule('jd')} />
-              <NavItem label="Smart Rewriter" isActive={activeModule === 'rewriter'} onClick={() => setActiveModule('rewriter')} />
-            </nav>
+          
+          {/* Navigation - Center (absolute positioned) */}
+          <nav className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-1 md:space-x-2 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <NavItem label="Builder" isActive={activeModule === 'builder'} onClick={() => setActiveModule('builder')} />
+            <NavItem label="ATS Checker" isActive={activeModule === 'ats'} onClick={() => setActiveModule('ats')} />
+            <NavItem label="JD Matcher" isActive={activeModule === 'jd'} onClick={() => setActiveModule('jd')} />
+            <NavItem label="Smart Rewriter" isActive={activeModule === 'rewriter'} onClick={() => setActiveModule('rewriter')} />
+          </nav>
+          
+          {/* Theme Toggle - Right */}
+          <div>
             <ThemeToggle />
           </div>
         </div>
