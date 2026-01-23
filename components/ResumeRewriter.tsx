@@ -390,61 +390,61 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
     )}
 
     <div className="max-w-6xl mx-auto">
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8 no-print">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8 no-print transition-colors duration-200">
         <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
             </div>
             <div>
-                <h2 className="text-2xl font-bold text-gray-800">Smart Resume Rewriter</h2>
-                <p className="text-gray-600">Automatically rewrite your resume to target a specific job description for maximum ATS impact.</p>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Smart Resume Rewriter</h2>
+                <p className="text-gray-600 dark:text-gray-300">Automatically rewrite your resume to target a specific job description for maximum ATS impact.</p>
             </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block font-medium mb-2">Target Job Description (JD)</label>
+            <label className="block font-medium mb-2 text-gray-700 dark:text-gray-200">Target Job Description (JD)</label>
             <textarea
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
-              className="w-full h-64 p-3 border rounded-md focus:ring-2 focus:ring-purple-500 transition"
+              className="w-full h-64 p-3 border dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 transition"
               placeholder="Paste the full job description here..."
             />
           </div>
           <div>
-            <label className="block font-medium mb-2">Your Current Resume</label>
+            <label className="block font-medium mb-2 text-gray-700 dark:text-gray-200">Your Current Resume</label>
             {isUsingBuilderResume ? (
-                 <div className="w-full h-64 p-3 border rounded-md bg-gray-50 flex flex-col justify-center items-center text-center">
+                 <div className="w-full h-64 p-3 border dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 flex flex-col justify-center items-center text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-purple-500 mb-3" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-gray-700 font-medium">Using resume from Builder</p>
+                    <p className="text-gray-700 dark:text-gray-200 font-medium">Using resume from Builder</p>
                     <button 
                       onClick={() => { 
                         setIsUsingBuilderResume(false); 
                         setResumeContent(''); 
                         setFileName(''); 
                       }} 
-                      className="text-sm text-purple-600 hover:underline mt-4 font-medium"
+                      className="text-sm text-purple-600 dark:text-purple-400 hover:underline mt-4 font-medium"
                     >
                       Upload a different file
                     </button>
                 </div>
             ) : (
                 <div className="flex items-center justify-center w-full">
-                    <label htmlFor="dropzone-file-rewrite" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <label htmlFor="dropzone-file-rewrite" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
                         <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                            <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                            <svg className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
                                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
                             </svg>
                             {fileName ? (
-                              <p className="mb-2 text-sm text-gray-700 font-semibold truncate">{fileName}</p>
+                              <p className="mb-2 text-sm text-gray-700 dark:text-gray-200 font-semibold truncate">{fileName}</p>
                             ) : (
                               <>
-                                <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span></p>
-                                <p className="text-xs text-gray-500">PDF, DOCX, TXT</p>
+                                <p className="mb-2 text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">Click to upload</span></p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">PDF, DOCX, TXT</p>
                               </>
                             )}
                         </div>
@@ -457,19 +457,19 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
         <button
           onClick={handleRewrite}
           disabled={isLoading}
-          className="mt-6 w-full bg-purple-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-purple-700 disabled:bg-purple-300 transition-colors flex items-center justify-center shadow-lg"
+          className="mt-6 w-full bg-purple-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-purple-700 disabled:bg-purple-300 dark:disabled:bg-purple-800 transition-colors flex items-center justify-center shadow-lg"
         >
           {isLoading ? <Loader /> : 'Rewrite My Resume'}
         </button>
-        {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
+        {error && <p className="text-red-500 dark:text-red-400 mt-4 text-center">{error}</p>}
       </div>
 
       {rewrittenResult && (
         <div className="space-y-8 animate-fade-in no-print">
             
             {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-purple-100">
-                <h3 className="text-lg font-bold text-gray-800">Optimization Complete</h3>
+            <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-purple-100 dark:border-purple-900/50 transition-colors duration-200">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Optimization Complete</h3>
                 <button 
                     onClick={() => setIsPreviewOpen(true)}
                     className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 font-medium transition shadow"
@@ -482,58 +482,58 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
             </div>
 
             {/* Summary Section */}
-            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-purple-500 transition-colors duration-200">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-800">Optimized Summary</h3>
-                        <p className="text-sm text-gray-500 italic mt-1">{rewrittenResult.summary.reasoning}</p>
+                        <h3 className="text-xl font-bold text-gray-800 dark:text-white">Optimized Summary</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">{rewrittenResult.summary.reasoning}</p>
                     </div>
                     <button 
                         onClick={() => copyToClipboard(rewrittenResult.summary.content, 'summary')}
-                        className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition"
+                        className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition"
                     >
                         {copiedSection === 'summary' ? 'Copied!' : 'Copy'}
                     </button>
                 </div>
-                <div className="p-4 bg-gray-50 rounded text-gray-800 leading-relaxed whitespace-pre-wrap border border-gray-100">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-100 leading-relaxed whitespace-pre-wrap border border-gray-100 dark:border-gray-600">
                     {rewrittenResult.summary.content}
                 </div>
             </div>
 
              {/* Skills Section */}
-             <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-blue-500 transition-colors duration-200">
                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">Targeted Skills</h3>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Targeted Skills</h3>
                     <button 
                         onClick={() => copyToClipboard(rewrittenResult.skills.finalList, 'skills')}
-                        className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition"
+                        className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition"
                     >
                         {copiedSection === 'skills' ? 'Copied!' : 'Copy'}
                     </button>
                 </div>
                 <div className="mb-4">
-                    <p className="font-medium text-gray-700 mb-2">Optimized List (Bullet Points):</p>
-                    <div className="p-3 bg-gray-50 rounded border border-gray-100 text-gray-800 whitespace-pre-wrap">
+                    <p className="font-medium text-gray-700 dark:text-gray-200 mb-2">Optimized List (Bullet Points):</p>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-100 dark:border-gray-600 text-gray-800 dark:text-gray-100 whitespace-pre-wrap">
                         {rewrittenResult.skills.finalList}
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-4">
                     {rewrittenResult.skills.added.length > 0 && (
                         <div className="flex-1">
-                            <span className="text-xs font-bold text-green-600 uppercase">Added Keywords</span>
+                            <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase">Added Keywords</span>
                             <div className="flex flex-wrap gap-2 mt-1">
                                 {rewrittenResult.skills.added.map((skill, i) => (
-                                    <span key={i} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">{skill}</span>
+                                    <span key={i} className="px-2 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 text-xs rounded-full">{skill}</span>
                                 ))}
                             </div>
                         </div>
                     )}
                     {rewrittenResult.skills.removed.length > 0 && (
                          <div className="flex-1">
-                            <span className="text-xs font-bold text-red-500 uppercase">Removed (Irrelevant)</span>
+                            <span className="text-xs font-bold text-red-500 dark:text-red-400 uppercase">Removed (Irrelevant)</span>
                             <div className="flex flex-wrap gap-2 mt-1">
                                 {rewrittenResult.skills.removed.map((skill, i) => (
-                                    <span key={i} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">{skill}</span>
+                                    <span key={i} className="px-2 py-1 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 text-xs rounded-full">{skill}</span>
                                 ))}
                             </div>
                         </div>
@@ -543,18 +543,18 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
 
             {/* Experience Section */}
             <div>
-                <h3 className="text-xl font-bold text-gray-800 mb-4 px-2">Rewritten Experience</h3>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 px-2">Rewritten Experience</h3>
                 <div className="space-y-6">
                     {rewrittenResult.experience.map((exp, idx) => (
-                        <div key={idx} className="bg-white p-6 rounded-lg shadow-md">
+                        <div key={idx} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md transition-colors duration-200">
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <h4 className="text-lg font-bold text-gray-800">{exp.role} | {exp.company}</h4>
-                                    <p className="text-sm text-gray-600 font-medium">{exp.date || ''} {exp.location ? `• ${exp.location}` : ''}</p>
+                                    <h4 className="text-lg font-bold text-gray-800 dark:text-white">{exp.role} | {exp.company}</h4>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">{exp.date || ''} {exp.location ? `• ${exp.location}` : ''}</p>
                                 </div>
                                 <button 
                                     onClick={() => copyToClipboard(exp.rewrittenDescription, `exp-${idx}`)}
-                                    className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition"
+                                    className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition"
                                 >
                                     {copiedSection === `exp-${idx}` ? 'Copied!' : 'Copy'}
                                 </button>
@@ -562,19 +562,19 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
                             
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-2">
-                                    <div className="p-4 bg-blue-50 rounded border border-blue-100">
-                                        <p className="text-sm font-semibold text-blue-800 mb-2">Optimized Content (Paragraph):</p>
-                                        <div className="text-gray-800 text-sm whitespace-pre-wrap leading-relaxed text-justify">
+                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Optimized Content (Paragraph):</p>
+                                        <div className="text-gray-800 dark:text-gray-100 text-sm whitespace-pre-wrap leading-relaxed text-justify">
                                             {exp.rewrittenDescription}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="lg:col-span-1">
-                                     <div className="p-4 bg-green-50 rounded border border-green-100 h-full">
-                                        <p className="text-sm font-semibold text-green-800 mb-2">Improvements Made:</p>
+                                     <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded border border-green-100 dark:border-green-800 h-full">
+                                        <p className="text-sm font-semibold text-green-800 dark:text-green-300 mb-2">Improvements Made:</p>
                                         <ul className="list-disc list-inside space-y-1">
                                             {exp.improvements.map((imp, i) => (
-                                                <li key={i} className="text-xs text-gray-700">{imp}</li>
+                                                <li key={i} className="text-xs text-gray-700 dark:text-gray-300">{imp}</li>
                                             ))}
                                         </ul>
                                      </div>
@@ -587,26 +587,26 @@ const ResumeRewriter: React.FC<{ initialResumeText?: string }> = ({ initialResum
 
              {/* Projects Section */}
              <div>
-                <h3 className="text-xl font-bold text-gray-800 mb-4 mt-8 px-2">Rewritten Projects</h3>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 mt-8 px-2">Rewritten Projects</h3>
                 <div className="space-y-6">
                     {rewrittenResult.projects.map((proj, idx) => (
-                        <div key={idx} className="bg-white p-6 rounded-lg shadow-md">
+                        <div key={idx} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md transition-colors duration-200">
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <h4 className="text-lg font-bold text-gray-800">{proj.title}</h4>
-                                    <p className="text-gray-600 font-medium">{proj.technologies}</p>
+                                    <h4 className="text-lg font-bold text-gray-800 dark:text-white">{proj.title}</h4>
+                                    <p className="text-gray-600 dark:text-gray-400 font-medium">{proj.technologies}</p>
                                 </div>
                                 <button 
                                     onClick={() => copyToClipboard(proj.description, `proj-${idx}`)}
-                                    className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition"
+                                    className="text-sm flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition"
                                 >
                                     {copiedSection === `proj-${idx}` ? 'Copied!' : 'Copy'}
                                 </button>
                             </div>
                             
-                             <div className="p-4 bg-blue-50 rounded border border-blue-100">
-                                <p className="text-sm font-semibold text-blue-800 mb-2">Optimized Content (Paragraph):</p>
-                                <div className="text-gray-800 text-sm whitespace-pre-wrap leading-relaxed text-justify">
+                             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Optimized Content (Paragraph):</p>
+                                <div className="text-gray-800 dark:text-gray-100 text-sm whitespace-pre-wrap leading-relaxed text-justify">
                                     {proj.description}
                                 </div>
                             </div>

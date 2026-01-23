@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Header from './components/Header';
 import ResumeBuilder from './components/ResumeBuilder';
 import ATSChecker from './components/ATSChecker';
@@ -9,7 +10,7 @@ import { ResumeData } from './types';
 
 export type Module = 'builder' | 'ats' | 'jd' | 'rewriter';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [activeModule, setActiveModule] = useState<Module>('builder');
   const [resumeForAnalysis, setResumeForAnalysis] = useState<string>('');
 
@@ -61,7 +62,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-200">
       <Header activeModule={activeModule} setActiveModule={setActiveModule} />
       <main className="p-4 md:p-8">
         {activeModule === 'builder' && <ResumeBuilder onAnalyze={handleNavigateToChecker} />}
@@ -70,6 +71,14 @@ const App: React.FC = () => {
         {activeModule === 'rewriter' && <ResumeRewriter initialResumeText={resumeForAnalysis} />}
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 

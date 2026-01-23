@@ -18,7 +18,7 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
     <div className="relative w-48 h-48">
       <svg className="w-full h-full" viewBox="0 0 200 200">
         <circle
-          className="text-gray-200"
+          className="text-gray-200 dark:text-gray-700"
           strokeWidth="15"
           stroke="currentColor"
           fill="transparent"
@@ -44,7 +44,7 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
         <span className="text-4xl font-bold" style={{ color: color }}>
           {score}
         </span>
-        <span className="text-sm text-gray-500">out of 100</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">out of 100</span>
       </div>
     </div>
   );
