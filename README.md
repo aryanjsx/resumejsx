@@ -12,9 +12,6 @@ AI Resume Architect is an all-in-one, modern web application designed to empower
 
 - **📝 Dynamic Resume Builder:**
   - Create a professional resume from scratch with dedicated sections for personal info, summary, experience, education, projects, skills, and certifications.
-  - **AI-Powered Content Suggestions:** Use the AI Assist feature to generate professional summary options tailored to your profile.
-  - **Customizable Section Order:** Drag and reorder resume sections to match your preference.
-  - **Template Import:** Upload an existing resume (PDF, Word, or image) and the AI will extract content while preserving the template style.
   - Enjoy a seamless experience with a live, real-time preview that updates as you type.
   - Your progress is automatically saved to your browser's local storage, so you'll never lose your work.
 
@@ -41,12 +38,6 @@ AI Resume Architect is an all-in-one, modern web application designed to empower
 
 - **✨ Sleek & Responsive UI:**
   - A clean, modern, and intuitive user interface built with **Tailwind CSS** that looks great on any device.
-
-- **🌙 Dark Mode Support:**
-  - Toggle between light and dark themes with a single click.
-  - Your preference is automatically saved and persists across sessions.
-  - Respects your system's color scheme preference on first visit.
-  - Smooth transitions between themes for a polished experience.
 
 ---
 
@@ -126,10 +117,9 @@ Implemented at the Vercel Edge:
 
 ## 🚀 Upcoming Features (Roadmap)
 
+- **🤖 AI-Powered Content Suggestions**
 - **✍️ Cover Letter Generator**
 - **☁️ User Accounts & Cloud Storage**
-- **📱 Mobile App Version**
-- **🔗 LinkedIn Profile Import**
 
 ---
 
