@@ -10,6 +10,385 @@ const atsSchema = {
     overallScore: { type: Type.INTEGER, description: "Overall ATS score from 0-100" },
     breakdown: {
       type: Type.ARRAY,
+// FIX: Initialize the GoogleGenAI client directly with the environment variable as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const atsSchema = {
+  type: Type.OBJECT,
+  properties: {
+    overallScore: { type: Type.INTEGER, description: "Overall ATS score from 0-100" },
+    breakdown: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          category: { type: Type.STRING, description: "The name of the scoring category (e.g., 'Format & Structure')." },
+          score: { type: Type.INTEGER, description: "The score achieved in this category." },
+          maxScore: { type: Type.INTEGER, description: "The maximum possible score for this category." },
+        },
+        required: ["category", "score", "maxScore"],
+      },
+      description: "A list of scoring categories, their achieved scores, and max possible scores."
+    },
+    feedback: {
+    const resumePart = typeof resume === 'string'
+        ? { text: `Original Resume:\n---\n${resume}\n---` }
+        : { inlineData: { data: resume.data, mimeType: resume.mimeType } };
+
+1. **Extract ALL Resume Content:** Parse the resume completely and extract:
+   - Personal Information (name, email, phone, location, LinkedIn URL, portfolio URL)
+   - Professional Summary/Objective
+   - Work Experience (each entry with company, role, location, start date, end date, and full description with bullet points preserved)
+   - Education (each entry with institution, degree, location, dates, GPA if present)
+   - Projects (title, description, technologies, dates, links if present)
+   - Skills (categorized if the resume has categories, otherwise create logical categories)
+   - Certifications (name, issuer, date)
+
+2. **Analyze the Template Design:** Carefully examine the visual design and layout of the resume:
+   - Layout: Is it single-column, two-column, sidebar-left, or sidebar-right?
+   - Header Style: How is the name/contact displayed - centered, left-aligned, banner style, or minimal?
+   - Color Scheme: Identify the primary, secondary, accent, background, and text colors (provide hex codes)
+   - Font Style: What fonts are used for headings and body? Are headings small, medium, or large?
+   - Section Styling: What type of dividers are used between sections? What bullet style? How much spacing?
+   - Overall Theme: Give a descriptive name to this template style
+
+Generate unique IDs for each experience, education, project, skill category, and certification using format like "exp_1", "edu_1", "proj_1", "skill_1", "cert_1".
+
+For any missing fields, use empty strings. Be thorough in capturing all content exactly as it appears.`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: {
+            parts: [
+                { text: prompt },
+                { inlineData: { data: resumeFile.data, mimeType: resumeFile.mimeType } }
+            ]
+        },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: parsedResumeWithTemplateSchema,
+        }
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText) as ParsedResumeWithTemplate;
+}
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: {
+            parts: [
+                { text: prompt },
+                { text: `Target Job Description:\n---\n${jdText}\n---` },
+                resumePart,
+            ]
+        },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: rewrittenResumeSchema,
+        }
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText) as RewrittenResume;
+}
+
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          issue: { type: Type.STRING, description: "The specific issue found." },
+          suggestion: { type: Type.STRING, description: "An actionable suggestion to fix the issue." },
+          severity: { type: Type.STRING, description: "Severity of the issue (High, Medium, or Low)." },
+        },
+        required: ["issue", "suggestion", "severity"],
+      },
+    },
+  },
+  required: ["overallScore", "breakdown", "feedback"],
+};
+
+const jdMatchSchema = {
+    type: Type.OBJECT,
+    properties: {
+        matchPercentage: { type: Type.INTEGER, description: "A percentage (0-100) of how well the resume aligns with the job description." },
+        atsScoreAsPerJD: { type: Type.INTEGER, description: "An ATS score (0-100) indicating how well the resume is optimized for this specific job description." },
+        missingKeywords: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of crucial keywords from the job description that should be added to the resume."
+        },
+        redundantKeywords: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of irrelevant or overused keywords/phrases that could be removed from the resume."
+        },
+        suggestions: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    area: { type: Type.STRING, description: "The section of the resume to improve (e.g., 'Work Experience', 'Skills')." },
+                    suggestion: { type: Type.STRING, description: "A specific, actionable suggestion for improvement, such as adding or removing a keyword, or rephrasing a bullet point." },
+                    impact: { type: Type.STRING, description: "The potential impact of the change (High, Medium, or Low)." }
+                },
+                required: ["area", "suggestion", "impact"],
+            },
+            description: "A prioritized list of optimization suggestions."
+        }
+    },
+    required: ["matchPercentage", "atsScoreAsPerJD", "missingKeywords", "redundantKeywords", "suggestions"],
+};
+
+const contentSuggestionSchema = {
+    type: Type.OBJECT,
+    properties: {
+        suggestions: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of suggested text content for the resume."
+        }
+    },
+    required: ["suggestions"]
+};
+
+const rewrittenResumeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        personalInfo: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING },
+                email: { type: Type.STRING },
+                phone: { type: Type.STRING },
+                location: { type: Type.STRING },
+                linkedin: { type: Type.STRING },
+                portfolio: { type: Type.STRING },
+            },
+            required: ["name"]
+        },
+        summary: {
+            type: Type.OBJECT,
+            properties: {
+                content: { type: Type.STRING, description: "The completely rewritten professional summary." },
+                reasoning: { type: Type.STRING, description: "Why this summary is better for the JD." }
+            },
+            required: ["content", "reasoning"]
+        },
+        experience: {
+            type: Type.ARRAY,
+            description: "List of rewritten work experience entries.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    company: { type: Type.STRING, description: "Company name from original resume." },
+                    role: { type: Type.STRING, description: "Role/Title." },
+                    location: { type: Type.STRING, description: "Location of the company." },
+                    date: { type: Type.STRING, description: "Employment period (e.g. 'June 2024 - Present')." },
+                    rewrittenDescription: { type: Type.STRING, description: "The optimized description in paragraph format." },
+                    improvements: { 
+                        type: Type.ARRAY, 
+                        items: { type: Type.STRING },
+                        description: "List of specific improvements made (e.g. 'Added keyword X')."
+                    }
+                },
+                required: ["company", "role", "location", "date", "rewrittenDescription", "improvements"]
+            }
+        },
+        education: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     institution: { type: Type.STRING },
+                     degree: { type: Type.STRING },
+                     location: { type: Type.STRING },
+                     startDate: { type: Type.STRING },
+                     endDate: { type: Type.STRING },
+                     gpa: { type: Type.STRING }
+                 },
+                 required: ["institution", "degree"]
+             }
+        },
+        projects: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     title: { type: Type.STRING },
+                     technologies: { type: Type.STRING },
+                     startDate: { type: Type.STRING },
+                     endDate: { type: Type.STRING },
+                     description: { type: Type.STRING, description: "Rewritten description in paragraph format." },
+                     liveLink: { type: Type.STRING },
+                     githubLink: { type: Type.STRING }
+                 },
+                 required: ["title", "description"]
+             }
+        },
+        certifications: {
+             type: Type.ARRAY,
+             items: {
+                 type: Type.OBJECT,
+                 properties: {
+                     name: { type: Type.STRING },
+                     issuer: { type: Type.STRING },
+                     date: { type: Type.STRING }
+                 },
+                 required: ["name"]
+             }
+        },
+        skills: {
+            type: Type.OBJECT,
+            properties: {
+                finalList: { type: Type.STRING, description: "The final optimized list of skills formatted as bullet points (e.g., '• Category: Skill 1, Skill 2')." },
+                added: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Skills added based on JD." },
+                removed: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Irrelevant skills removed." }
+            },
+            required: ["finalList", "added", "removed"]
+        }
+    },
+    required: ["personalInfo", "summary", "experience", "education", "projects", "certifications", "skills"]
+};
+
+const parsedResumeWithTemplateSchema = {
+    type: Type.OBJECT,
+    properties: {
+        resumeData: {
+            type: Type.OBJECT,
+            properties: {
+                personalInfo: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING },
+                        email: { type: Type.STRING },
+                        phone: { type: Type.STRING },
+                        location: { type: Type.STRING },
+                        linkedin: { type: Type.STRING },
+                        portfolio: { type: Type.STRING },
+                    },
+                    required: ["name", "email", "phone", "location", "linkedin", "portfolio"]
+                },
+                summary: { type: Type.STRING },
+                experience: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            company: { type: Type.STRING },
+                            role: { type: Type.STRING },
+                            location: { type: Type.STRING },
+                            startDate: { type: Type.STRING },
+                            endDate: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                        },
+                        required: ["id", "company", "role", "location", "startDate", "endDate", "description"]
+                    }
+                },
+                education: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            institution: { type: Type.STRING },
+                            degree: { type: Type.STRING },
+                            location: { type: Type.STRING },
+                            startDate: { type: Type.STRING },
+                            endDate: { type: Type.STRING },
+                            gpa: { type: Type.STRING },
+                        },
+                        required: ["id", "institution", "degree", "location", "startDate", "endDate", "gpa"]
+                    }
+                },
+                projects: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            technologies: { type: Type.STRING },
+                            startDate: { type: Type.STRING },
+                            endDate: { type: Type.STRING },
+                            liveLink: { type: Type.STRING },
+                            githubLink: { type: Type.STRING },
+                        },
+                        required: ["id", "title", "description", "technologies", "startDate", "endDate", "liveLink", "githubLink"]
+                    }
+                },
+                skills: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            category: { type: Type.STRING },
+                            skills: { type: Type.STRING },
+                        },
+                        required: ["id", "category", "skills"]
+                    }
+                },
+                certifications: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            name: { type: Type.STRING },
+                            issuer: { type: Type.STRING },
+                            date: { type: Type.STRING },
+                        },
+                        required: ["id", "name", "issuer", "date"]
+                    }
+                },
+            },
+            required: ["personalInfo", "summary", "experience", "education", "projects", "skills", "certifications"]
+        },
+        templateStyle: {
+            type: Type.OBJECT,
+            properties: {
+                layout: { type: Type.STRING, description: "Layout type: single-column, two-column, sidebar-left, or sidebar-right" },
+                headerStyle: { type: Type.STRING, description: "Header style: centered, left-aligned, banner, or minimal" },
+                colorScheme: {
+                    type: Type.OBJECT,
+                    properties: {
+                        primary: { type: Type.STRING, description: "Primary color in hex format (e.g., #2563eb)" },
+                        secondary: { type: Type.STRING, description: "Secondary color in hex format" },
+                        accent: { type: Type.STRING, description: "Accent color in hex format" },
+                        background: { type: Type.STRING, description: "Background color in hex format" },
+                        text: { type: Type.STRING, description: "Text color in hex format" },
+                    },
+                    required: ["primary", "secondary", "accent", "background", "text"]
+                },
+                fontStyle: {
+                    type: Type.OBJECT,
+                    properties: {
+                        headingFont: { type: Type.STRING, description: "Font family for headings (e.g., Georgia, Arial, Playfair Display)" },
+                        bodyFont: { type: Type.STRING, description: "Font family for body text" },
+                        headingSize: { type: Type.STRING, description: "Heading size: small, medium, or large" },
+                    },
+                    required: ["headingFont", "bodyFont", "headingSize"]
+                },
+                sectionStyle: {
+                    type: Type.OBJECT,
+                    properties: {
+                        dividerType: { type: Type.STRING, description: "Section divider: line, dots, none, or thick-line" },
+                        bulletStyle: { type: Type.STRING, description: "Bullet style: circle, square, dash, arrow, or none" },
+                        sectionSpacing: { type: Type.STRING, description: "Section spacing: compact, normal, or spacious" },
+                    },
+                    required: ["dividerType", "bulletStyle", "sectionSpacing"]
+                },
+                overallTheme: { type: Type.STRING, description: "Theme name like 'Modern Professional', 'Classic Academic', 'Creative Designer'" },
+                description: { type: Type.STRING, description: "Detailed description of the template's visual style and characteristics" },
+            },
+            required: ["layout", "headerStyle", "colorScheme", "fontStyle", "sectionStyle", "overallTheme", "description"]
+        }
+    },
+    required: ["resumeData", "templateStyle"]
+};
+
       items: {
         type: Type.OBJECT,
         properties: {

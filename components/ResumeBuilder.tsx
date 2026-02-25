@@ -42,6 +42,7 @@ const defaultTemplateStyle: ResumeTemplateStyle = {
   sectionStyle: {
     dividerType: 'line',
     bulletStyle: 'circle',
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
     sectionSpacing: 'normal',
   },
   overallTheme: 'Default Professional',
@@ -63,12 +64,19 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   // Template Upload State
   const [templateStyle, setTemplateStyle] = useState<ResumeTemplateStyle>(defaultTemplateStyle);
   const [isUploading, setIsUploading] = useState(false);
+  const [templateStyle, setTemplateStyle] = useState<ResumeTemplateStyle>(defaultTemplateStyle);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Section Order State
   type SectionKey = 'summary' | 'experience' | 'education' | 'projects' | 'certifications' | 'skills';
+  // Section Order State
+  type SectionKey = 'summary' | 'experience' | 'education' | 'projects' | 'certifications' | 'skills';
+  const defaultSectionOrder: SectionKey[] = ['summary', 'experience', 'education', 'projects', 'certifications', 'skills'];
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
+
   const defaultSectionOrder: SectionKey[] = ['summary', 'experience', 'education', 'projects', 'certifications', 'skills'];
   const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
 
@@ -98,12 +106,30 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   useEffect(() => {
     localStorage.setItem('resumeData', JSON.stringify(resumeData));
   }, [resumeData]);
+    setResumes(getAllResumes());
 
   // Load saved template style from localStorage
   useEffect(() => {
     const savedTemplateStyle = localStorage.getItem('templateStyle');
     const savedFileName = localStorage.getItem('uploadedFileName');
     if (savedTemplateStyle) {
+  // Load section order from localStorage
+  useEffect(() => {
+    const savedSectionOrder = localStorage.getItem('sectionOrder');
+    if (savedSectionOrder) {
+      try {
+        setSectionOrder(JSON.parse(savedSectionOrder));
+      } catch (e) {
+        console.error("Could not parse section order from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Save section order to localStorage
+  useEffect(() => {
+    localStorage.setItem('sectionOrder', JSON.stringify(sectionOrder));
+  }, [sectionOrder]);
+
       try {
         setTemplateStyle(JSON.parse(savedTemplateStyle));
         if (savedFileName) setUploadedFileName(savedFileName);
@@ -269,6 +295,8 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     setAiTarget({ type: 'summary' });
     setIsAiModalOpen(true);
     setAiSuggestions([]);
+    const element = printAreaRef.current ?? document.getElementById('print-area');
+    if (!element) return;
     setSelectedSuggestions([]);
 
     try {
@@ -460,6 +488,29 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               spacing: { before: 100 },
             }));
           });
+          if (proj.liveLink || proj.githubLink) {
+            const linkChildren: (TextRun | typeof ExternalHyperlink)[] = [];
+            if (proj.liveLink) {
+              linkChildren.push(new ExternalHyperlink({
+                children: [new TextRun({ text: 'Live Demo', color: '0000FF', underline: {} })],
+                link: proj.liveLink,
+              }));
+            }
+            if (proj.liveLink && proj.githubLink) {
+              linkChildren.push(new TextRun({ text: ' | ' }));
+            }
+            if (proj.githubLink) {
+              linkChildren.push(new ExternalHyperlink({
+                children: [new TextRun({ text: 'GitHub', color: '0000FF', underline: {} })],
+                link: proj.githubLink,
+              }));
+            }
+            docChildren.push(new Paragraph({
+              children: linkChildren,
+              indent: { left: 720 },
+              spacing: { before: 100 },
+            }));
+          }
           docChildren.push(new Paragraph(""));
         });
       }
@@ -718,6 +769,12 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               <ul className={`${getBulletStyle()} list-inside mt-1 text-sm`} style={{ color: colors.text }}>
                 {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
               </ul>
+              {(proj.liveLink || proj.githubLink) && (
+                <p className="text-sm mt-1 flex gap-3 flex-wrap" style={{ color: colors.accent }}>
+                  {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline">Live Demo</a>}
+                  {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -843,6 +900,12 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                       <ul className={`${getBulletStyle()} list-inside mt-1 whitespace-pre-wrap`} style={{ color: colors.text }}>
                         {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
                       </ul>
+                      {(proj.liveLink || proj.githubLink) && (
+                        <p className="text-sm mt-1 flex gap-3 flex-wrap" style={{ color: colors.accent }}>
+                          {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline">Live Demo</a>}
+                          {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </React.Fragment>
