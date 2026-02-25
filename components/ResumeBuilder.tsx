@@ -3,7 +3,10 @@ import React, { useState, useEffect, ChangeEvent, useRef, DragEvent } from 'reac
 import { ResumeData, PersonalInfo, WorkExperience, Education, CategorizedSkill, Project, Certification, ResumeTemplateStyle } from '../types';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopType, TabStopPosition, BorderStyle, ExternalHyperlink } from 'docx';
 import saveAs from 'file-saver';
+import html2pdf from 'html2pdf.js';
 import { generateContentSuggestions, parseResumeWithTemplate } from '../services/geminiService';
+import { getAllResumes, getResumeById, getActiveResumeId, setActiveResumeId, createResume, updateResume, deleteResume, ensureAtLeastOne, exportAllResumes, importResumes, type StoredResume, type SectionKey } from '../services/resumeStorage';
+import { presetTemplates } from '../data/presetTemplates';
 import Loader from './Loader';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -48,9 +51,16 @@ const defaultTemplateStyle: ResumeTemplateStyle = {
   description: 'A clean, professional single-column layout with black text and traditional serif headings.',
 };
 
+const defaultSectionOrder: SectionKey[] = ['summary', 'experience', 'education', 'projects', 'certifications', 'skills'];
+
 const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAnalyze}) => {
   const { isDark } = useTheme();
+  const [activeResumeId, setActiveResumeIdState] = useState<string | null>(() => getActiveResumeId());
+  const [resumes, setResumes] = useState<StoredResume[]>(() => getAllResumes());
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
+  const [templateStyle, setTemplateStyle] = useState<ResumeTemplateStyle>(defaultTemplateStyle);
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   
   // AI Suggestion State
@@ -61,16 +71,11 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
 
   // Template Upload State
-  const [templateStyle, setTemplateStyle] = useState<ResumeTemplateStyle>(defaultTemplateStyle);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Section Order State
-  type SectionKey = 'summary' | 'experience' | 'education' | 'projects' | 'certifications' | 'skills';
-  const defaultSectionOrder: SectionKey[] = ['summary', 'experience', 'education', 'projects', 'certifications', 'skills'];
-  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(defaultSectionOrder);
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
   const sectionLabels: Record<SectionKey, string> = {
     summary: 'Summary',
@@ -81,62 +86,34 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     skills: 'Skills'
   };
 
+  // Initialize: migrate from legacy storage or ensure at least one resume
   useEffect(() => {
-    const savedData = localStorage.getItem('resumeData');
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-        if (parsedData.personalInfo) {
-          setResumeData(parsedData);
-        }
-      } catch (e) {
-        console.error("Could not parse resume data from localStorage", e);
-      }
-    }
+    const stored = ensureAtLeastOne(initialResumeData, defaultTemplateStyle, defaultSectionOrder);
+    setResumes(getAllResumes());
+    setActiveResumeIdState(stored.id);
+    setResumeData(stored.resumeData);
+    setTemplateStyle(stored.templateStyle);
+    setSectionOrder(stored.sectionOrder);
+    setUploadedFileName(stored.uploadedFileName);
   }, []);
 
+  // Load active resume when switching
   useEffect(() => {
-    localStorage.setItem('resumeData', JSON.stringify(resumeData));
-  }, [resumeData]);
-
-  // Load saved template style from localStorage
-  useEffect(() => {
-    const savedTemplateStyle = localStorage.getItem('templateStyle');
-    const savedFileName = localStorage.getItem('uploadedFileName');
-    if (savedTemplateStyle) {
-      try {
-        setTemplateStyle(JSON.parse(savedTemplateStyle));
-        if (savedFileName) setUploadedFileName(savedFileName);
-      } catch (e) {
-        console.error("Could not parse template style from localStorage", e);
-      }
+    if (!activeResumeId) return;
+    const r = getResumeById(activeResumeId);
+    if (r) {
+      setResumeData(r.resumeData);
+      setTemplateStyle(r.templateStyle);
+      setSectionOrder(r.sectionOrder);
+      setUploadedFileName(r.uploadedFileName);
     }
-  }, []);
+  }, [activeResumeId]);
 
-  // Save template style to localStorage
+  // Persist changes to active resume
   useEffect(() => {
-    localStorage.setItem('templateStyle', JSON.stringify(templateStyle));
-    if (uploadedFileName) {
-      localStorage.setItem('uploadedFileName', uploadedFileName);
-    }
-  }, [templateStyle, uploadedFileName]);
-
-  // Load section order from localStorage
-  useEffect(() => {
-    const savedSectionOrder = localStorage.getItem('sectionOrder');
-    if (savedSectionOrder) {
-      try {
-        setSectionOrder(JSON.parse(savedSectionOrder));
-      } catch (e) {
-        console.error("Could not parse section order from localStorage", e);
-      }
-    }
-  }, []);
-
-  // Save section order to localStorage
-  useEffect(() => {
-    localStorage.setItem('sectionOrder', JSON.stringify(sectionOrder));
-  }, [sectionOrder]);
+    if (!activeResumeId) return;
+    updateResume(activeResumeId, { resumeData, templateStyle, sectionOrder, uploadedFileName });
+  }, [resumeData, templateStyle, sectionOrder, uploadedFileName, activeResumeId]);
 
   // Section reordering functions
   const moveSectionUp = (index: number) => {
@@ -155,6 +132,39 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
   const resetSectionOrder = () => {
     setSectionOrder(defaultSectionOrder);
+  };
+
+  const handleCreateNewResume = () => {
+    const created = createResume('New Resume', initialResumeData, defaultTemplateStyle, defaultSectionOrder, null);
+    setResumes(getAllResumes());
+    setActiveResumeIdState(created.id);
+    setResumeData(created.resumeData);
+    setTemplateStyle(created.templateStyle);
+    setSectionOrder(created.sectionOrder);
+    setUploadedFileName(null);
+  };
+
+  const handleSwitchResume = (id: string) => {
+    setActiveResumeId(id);
+    setActiveResumeIdState(id);
+  };
+
+  const handleDeleteResume = (id: string) => {
+    const remaining = getAllResumes().filter((r) => r.id !== id);
+    if (remaining.length === 0) return;
+    deleteResume(id);
+    setResumes(getAllResumes());
+    const next = remaining[0];
+    setActiveResumeIdState(next.id);
+    setResumeData(next.resumeData);
+    setTemplateStyle(next.templateStyle);
+    setSectionOrder(next.sectionOrder);
+    setUploadedFileName(next.uploadedFileName);
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    const t = presetTemplates.find((p) => p.id === templateId);
+    if (t) setTemplateStyle(t.style);
   };
 
   // File upload handlers
@@ -306,8 +316,22 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
   };
 
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportPdf = async () => {
+    const element = printAreaRef.current ?? document.getElementById('print-area');
+    if (!element) return;
+    setIsExportingPdf(true);
+    try {
+      const opt = {
+        margin: 10,
+        filename: `${resumeData.personalInfo.name.replace(/\s+/g, '_') || 'resume'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      await html2pdf().set(opt).from(element).save();
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const handleExportWord = () => {
@@ -318,13 +342,13 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     const primaryColor = hexToWordColor(templateStyle.colorScheme.primary);
     const secondaryColor = hexToWordColor(templateStyle.colorScheme.secondary);
     
-    // Determine heading size based on template
+    // Match preview: text-lg=18px, text-xl=20px, text-2xl=24px. Docx uses half-points (1pt≈1.33px)
     const getHeadingFontSize = (): number => {
       switch (templateStyle.fontStyle.headingSize) {
-        case 'small': return 22;
-        case 'medium': return 24;
-        case 'large': return 28;
-        default: return 24;
+        case 'small': return 26;   // ~13pt
+        case 'medium': return 30;   // ~15pt
+        case 'large': return 36;    // ~18pt
+        default: return 30;
       }
     };
 
@@ -339,13 +363,21 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
       }
     };
 
+    const getSectionSpacing = () => {
+      switch (templateStyle.sectionStyle.sectionSpacing) {
+        case 'compact': return 120;
+        case 'spacious': return 360;
+        default: return 240;
+      }
+    };
+    const wordFont = (f: string) => (f === 'system-ui' ? 'Calibri' : f);
     const createSectionTitle = (text: string) => {
       return new Paragraph({
-        children: [new TextRun({ text: text.toUpperCase(), bold: true, color: primaryColor, size: getHeadingFontSize() })],
+        children: [new TextRun({ text: text.toUpperCase(), bold: true, color: primaryColor, size: getHeadingFontSize(), font: wordFont(templateStyle.fontStyle.headingFont) })],
         border: templateStyle.sectionStyle.dividerType !== 'none' ? {
           bottom: { color: primaryColor, space: 1, style: getBorderStyleForSection(), size: templateStyle.sectionStyle.dividerType === 'thick-line' ? 12 : 6 },
         } : undefined,
-        spacing: { after: templateStyle.sectionStyle.sectionSpacing === 'compact' ? 100 : templateStyle.sectionStyle.sectionSpacing === 'spacious' ? 300 : 200 },
+        spacing: { after: getSectionSpacing() },
       });
     };
 
@@ -354,9 +386,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
       : AlignmentType.LEFT;
     
     const docChildren: Paragraph[] = [
-      // Personal Info
+      // Personal Info - match preview text-4xl (~36px ≈ 54 half-points)
       new Paragraph({
-        children: [new TextRun({ text: personalInfo.name, bold: true, size: 52, color: primaryColor })],
+        children: [new TextRun({ text: personalInfo.name, bold: true, size: 54, color: primaryColor, font: wordFont(templateStyle.fontStyle.headingFont) })],
         alignment: headerAlignment,
       }),
       new Paragraph({
@@ -460,6 +492,30 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               spacing: { before: 100 },
             }));
           });
+          if (proj.liveLink) {
+            docChildren.push(new Paragraph({
+              children: [
+                new TextRun({ text: 'Live: ', color: secondaryColor }),
+                new ExternalHyperlink({
+                  children: [new TextRun({ text: proj.liveLink, color: '0000FF', underline: {} })],
+                  link: proj.liveLink,
+                }),
+              ],
+              indent: { left: 720 },
+            }));
+          }
+          if (proj.githubLink) {
+            docChildren.push(new Paragraph({
+              children: [
+                new TextRun({ text: 'GitHub: ', color: secondaryColor }),
+                new ExternalHyperlink({
+                  children: [new TextRun({ text: proj.githubLink, color: '0000FF', underline: {} })],
+                  link: proj.githubLink,
+                }),
+              ],
+              indent: { left: 720 },
+            }));
+          }
           docChildren.push(new Paragraph(""));
         });
       }
@@ -718,6 +774,13 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               <ul className={`${getBulletStyle()} list-inside mt-1 text-sm`} style={{ color: colors.text }}>
                 {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
               </ul>
+              {(proj.liveLink || proj.githubLink) && (
+                <p className="text-xs mt-1" style={{ color: colors.accent }}>
+                  {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline mr-2">Live</a>}
+                  {proj.liveLink && proj.githubLink && ' | '}
+                  {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -843,6 +906,13 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                       <ul className={`${getBulletStyle()} list-inside mt-1 whitespace-pre-wrap`} style={{ color: colors.text }}>
                         {proj.description.split('\n').map((line, i) => line.trim() && <li key={i}>{line.replace(/^- /, '').trim()}</li>)}
                       </ul>
+                      {(proj.liveLink || proj.githubLink) && (
+                        <p className="text-sm mt-1" style={{ color: colors.accent }}>
+                          {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline mr-2">Live</a>}
+                          {proj.liveLink && proj.githubLink && ' | '}
+                          {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </React.Fragment>
@@ -977,6 +1047,57 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
         {/* Form Section */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md no-print max-h-[109vh] overflow-y-auto transition-colors duration-200">
           <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Resume Content</h2>
+          
+          {/* Multi-Resume Switcher */}
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Resumes</h3>
+              <div className="flex gap-2">
+                <button onClick={() => { const blob = new Blob([exportAllResumes()], { type: 'application/json' }); saveAs(blob, 'resumes-backup.json'); }} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="Backup all resumes">Backup</button>
+                <label className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer" title="Restore from backup">
+                  Restore <input type="file" accept=".json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const reader = new FileReader(); reader.onload = () => { const res = importResumes(reader.result as string); if (res.success) { setResumes(getAllResumes()); const aid = getActiveResumeId(); const active = aid ? getResumeById(aid) : null; if (active) { setResumeData(active.resumeData); setTemplateStyle(active.templateStyle); setSectionOrder(active.sectionOrder); setUploadedFileName(active.uploadedFileName); setActiveResumeIdState(active.id); } } else { alert(res.error); } }; reader.readAsText(f); } e.target.value = ''; }} />
+                </label>
+                <button onClick={handleCreateNewResume} className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium">+ New Resume</button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {resumes.map((r) => (
+                <div key={r.id} className="flex items-center gap-1 bg-white dark:bg-gray-600 rounded px-2 py-1 border border-gray-200 dark:border-gray-500">
+                  <button
+                    onClick={() => handleSwitchResume(r.id)}
+                    className={`text-sm font-medium truncate max-w-[120px] ${activeResumeId === r.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+                  >
+                    {r.name}
+                  </button>
+                  {resumes.length > 1 && (
+                    <button onClick={() => handleDeleteResume(r.id)} className="text-red-500 hover:text-red-700 p-0.5" aria-label="Delete resume">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Template Selector */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Choose Template</h3>
+            <div className="flex flex-wrap gap-2">
+              {presetTemplates.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => handleSelectTemplate(t.id)}
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                    templateStyle.overallTheme === t.style.overallTheme
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
           
           {/* Resume Upload Section */}
           <div className="mb-6">
@@ -1240,7 +1361,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
               <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm">Export as PDF</button>
+                    <button onClick={handleExportPdf} disabled={isExportingPdf} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm disabled:opacity-70 disabled:cursor-not-allowed">{isExportingPdf ? 'Generating…' : 'Export as PDF'}</button>
                     <button onClick={handleExportWord} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">Export as Word</button>
                     <button onClick={() => setIsPreviewFullScreen(true)} className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400" aria-label="Enlarge preview">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1251,7 +1372,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                   <button onClick={() => onAnalyze(resumeData)} className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">Check ATS Score</button>
               </div>
           </div>
-          <div id="print-area" className="rounded-lg shadow-lg overflow-hidden">
+          <div id="print-area" ref={printAreaRef} className="rounded-lg shadow-lg overflow-hidden">
             <ResumePreview />
           </div>
         </div>
