@@ -322,11 +322,12 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     setIsExportingPdf(true);
     try {
       const opt = {
-        margin: 10,
+        margin: [10, 10, 10, 10],
         filename: `${resumeData.personalInfo.name.replace(/\s+/g, '_') || 'resume'}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'css', avoid: ['.resume-section'] },
       };
       await html2pdf().set(opt).from(element).save();
     } finally {
@@ -665,7 +666,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
         return null;
       }
       return (
-        <section className={getSectionSpacing()}>
+        <section className={`resume-section ${getSectionSpacing()}`} style={{ breakInside: 'avoid' }}>
           <h2 
             className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
             style={{ 
@@ -689,7 +690,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
         <div className="space-y-6">
           {/* Skills in sidebar */}
           {resumeData.skills.length > 0 && (
-            <section>
+            <section className="resume-section" style={{ breakInside: 'avoid' }}>
               <h2 
                 className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
                 style={{ color: colors.primary, borderColor: colors.accent, fontFamily: templateStyle.fontStyle.headingFont }}
@@ -707,7 +708,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
           
           {/* Certifications in sidebar */}
           {resumeData.certifications.length > 0 && (
-            <section>
+            <section className="resume-section" style={{ breakInside: 'avoid' }}>
               <h2 
                 className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
                 style={{ color: colors.primary, borderColor: colors.accent, fontFamily: templateStyle.fontStyle.headingFont }}
@@ -725,7 +726,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
 
           {/* Education in sidebar for compact layouts */}
           {resumeData.education.length > 0 && (
-            <section>
+            <section className="resume-section" style={{ breakInside: 'avoid' }}>
               <h2 
                 className={`${getHeadingSize()} font-bold ${getDividerStyle()} pb-1 mb-3`}
                 style={{ color: colors.primary, borderColor: colors.accent, fontFamily: templateStyle.fontStyle.headingFont }}
@@ -776,9 +777,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               </ul>
               {(proj.liveLink || proj.githubLink) && (
                 <p className="text-xs mt-1" style={{ color: colors.accent }}>
-                  {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline mr-2">Live</a>}
+                  {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="mr-2" style={{ color: '#2563eb', textDecoration: 'underline' }}>Live</a>}
                   {proj.liveLink && proj.githubLink && ' | '}
-                  {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                  {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>GitHub</a>}
                 </p>
               )}
             </div>
@@ -908,9 +909,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                       </ul>
                       {(proj.liveLink || proj.githubLink) && (
                         <p className="text-sm mt-1" style={{ color: colors.accent }}>
-                          {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="hover:underline mr-2">Live</a>}
+                          {proj.liveLink && <a href={proj.liveLink} target="_blank" rel="noopener noreferrer" className="mr-2" style={{ color: '#2563eb', textDecoration: 'underline' }}>Live</a>}
                           {proj.liveLink && proj.githubLink && ' | '}
-                          {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub</a>}
+                          {proj.githubLink && <a href={proj.githubLink} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>GitHub</a>}
                         </p>
                       )}
                     </div>
@@ -1372,7 +1373,7 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                   <button onClick={() => onAnalyze(resumeData)} className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">Check ATS Score</button>
               </div>
           </div>
-          <div id="print-area" ref={printAreaRef} className="rounded-lg shadow-lg overflow-hidden">
+          <div id="print-area" ref={printAreaRef} className="rounded-lg shadow-lg overflow-visible" style={{ width: '210mm', maxWidth: '100%' }}>
             <ResumePreview />
           </div>
         </div>
