@@ -689,9 +689,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
                 Skills
               </h2>
               {resumeData.skills.map((skill: CategorizedSkill) => (
-                <div key={skill.id} className="mb-2">
-                  <strong className="text-sm" style={{ color: colors.secondary }}>{skill.category}</strong>
-                  <p className="text-sm" style={{ color: colors.text }}>{skill.skills}</p>
+                <div key={skill.id} className="mb-2 flex items-baseline gap-2">
+                  <strong className="text-sm flex-shrink-0 min-w-[7rem]" style={{ color: colors.secondary }}>{skill.category}:</strong>
+                  <span className="text-sm" style={{ color: colors.text }}>{skill.skills}</span>
                 </div>
               ))}
             </section>
@@ -924,9 +924,9 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
               return (
                 <React.Fragment key="skills">
                   {renderTemplateSection('Skills', resumeData.skills, (skill: CategorizedSkill) => (
-                    <div key={skill.id} className="mb-1 flex" style={{ color: colors.text }}>
-                      <strong className="font-semibold w-48 flex-shrink-0" style={{ color: colors.secondary }}>{skill.category}:</strong>
-                      <span>{skill.skills}</span>
+                    <div key={skill.id} className="mb-1.5 flex items-baseline gap-2" style={{ color: colors.text }}>
+                      <strong className="font-semibold flex-shrink-0 min-w-[8.5rem]" style={{ color: colors.secondary }}>{skill.category}:</strong>
+                      <span className="min-w-0">{skill.skills}</span>
                     </div>
                   ))}
                 </React.Fragment>

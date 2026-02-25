@@ -233,9 +233,9 @@ const ResumePDFDocument: React.FC<Props> = ({ resumeData, templateStyle, section
           ? renderSection(
               'Skills',
               skills.map((skill) => (
-                <View key={skill.id} style={{ marginBottom: 2 }}>
-                  <Text style={{ fontWeight: 'bold', color: colors.secondary }}>{skill.category}: </Text>
-                  <Text style={{ color: colors.text }}>{skill.skills}</Text>
+                <View key={skill.id} style={{ marginBottom: 4, flexDirection: 'row' }}>
+                  <Text style={{ fontWeight: 'bold', color: colors.secondary, marginRight: 4 }}>{skill.category}: </Text>
+                  <Text style={{ color: colors.text, flex: 1 }}>{skill.skills}</Text>
                 </View>
               ))
             )
