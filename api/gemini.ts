@@ -166,7 +166,7 @@ Integrate JD keywords naturally. Return JSON with all sections.`;
 
       case 'parseResume': {
         const { resumeFile } = body;
-        const prompt = `You are an expert resume parser and design analyst. Extract ALL resume content (personal info, summary, experience, education, projects, skills, certifications) and analyze the template design (layout, header style, colors, fonts, section styling). Return JSON with resumeData and templateStyle. Use IDs like exp_1, edu_1, etc.`;
+        const prompt = `You are an expert resume parser and design analyst. Extract ALL resume content (personal info, summary, experience, education, projects, skills, certifications) and analyze the template design (layout, header style, colors, fonts, section styling). Return JSON with resumeData and templateStyle. Use IDs like exp_1, edu_1, proj_1, etc. For each project, include liveLink and githubLink (camelCase) if the resume mentions live demo or GitHub URLs.`;
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: { parts: [{ text: prompt }, { inlineData: { data: resumeFile.data, mimeType: resumeFile.mimeType } }] },
