@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.1",
+    "@react-pdf/renderer": "^4.3.2",
     "docx": "^8.5.0",
     "file-saver": "^2.0.5",
-    "html2pdf.js": "^0.14.0",
     "mammoth": "1.8.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
