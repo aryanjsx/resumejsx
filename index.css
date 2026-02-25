@@ -14,11 +14,14 @@ body {
   min-height: 100vh;
 }
 
-/* PDF export: proper word wrapping, avoid mid-word breaks */
+/* PDF export: proper word wrapping - applies to both on-screen and cloned capture */
 #print-area,
-#print-area * {
-  overflow-wrap: break-word;
-  word-break: normal;
+#print-area *,
+.pdf-capture,
+.pdf-capture * {
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+  overflow: visible !important;
   hyphens: auto;
 }
 

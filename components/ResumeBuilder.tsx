@@ -321,24 +321,36 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     if (!element) return;
     setIsExportingPdf(true);
     try {
-      // Clone and render at fixed A4 width (210mm ≈ 794px) to prevent text truncation
+      // Clone and render at fixed A4 width - must be in viewport for html2canvas to capture fully
       const A4_WIDTH_PX = 794;
       const clone = element.cloneNode(true) as HTMLElement;
       clone.removeAttribute('id');
+      clone.classList.add('pdf-capture');
       const wrapper = document.createElement('div');
-      wrapper.style.cssText = `position:fixed;left:-99999px;top:0;width:${A4_WIDTH_PX}px;overflow:visible;background:white;`;
+      wrapper.style.cssText = `position:fixed;top:0;left:0;width:${A4_WIDTH_PX}px;overflow:visible;background:white;z-index:-1;opacity:0;pointer-events:none;visibility:visible;`;
       clone.style.width = `${A4_WIDTH_PX}px`;
       clone.style.maxWidth = 'none';
       clone.style.overflow = 'visible';
       clone.style.boxSizing = 'border-box';
       wrapper.appendChild(clone);
       document.body.appendChild(wrapper);
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 150));
+      const w = clone.offsetWidth;
+      const h = clone.scrollHeight;
       const opt = {
         margin: [10, 10, 10, 10],
         filename: `${resumeData.personalInfo.name.replace(/\s+/g, '_') || 'resume'}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          width: w,
+          height: h,
+          windowWidth: A4_WIDTH_PX,
+          scrollX: 0,
+          scrollY: 0,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: 'css', avoid: ['.resume-section'] },
       };
