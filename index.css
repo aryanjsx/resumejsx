@@ -14,9 +14,11 @@ body {
   min-height: 100vh;
 }
 
-/* PDF export: prevent text truncation and improve wrapping */
-#print-area {
+/* PDF export: proper word wrapping, avoid mid-word breaks */
+#print-area,
+#print-area * {
   overflow-wrap: break-word;
-  word-break: break-word;
+  word-break: normal;
+  hyphens: auto;
 }
 

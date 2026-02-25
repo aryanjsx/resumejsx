@@ -321,6 +321,19 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
     if (!element) return;
     setIsExportingPdf(true);
     try {
+      // Clone and render at fixed A4 width (210mm ≈ 794px) to prevent text truncation
+      const A4_WIDTH_PX = 794;
+      const clone = element.cloneNode(true) as HTMLElement;
+      clone.removeAttribute('id');
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `position:fixed;left:-99999px;top:0;width:${A4_WIDTH_PX}px;overflow:visible;background:white;`;
+      clone.style.width = `${A4_WIDTH_PX}px`;
+      clone.style.maxWidth = 'none';
+      clone.style.overflow = 'visible';
+      clone.style.boxSizing = 'border-box';
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const opt = {
         margin: [10, 10, 10, 10],
         filename: `${resumeData.personalInfo.name.replace(/\s+/g, '_') || 'resume'}.pdf`,
@@ -329,7 +342,8 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: 'css', avoid: ['.resume-section'] },
       };
-      await html2pdf().set(opt).from(element).save();
+      await html2pdf().set(opt).from(clone).save();
+      wrapper.remove();
     } finally {
       setIsExportingPdf(false);
     }
@@ -1354,8 +1368,8 @@ const ResumeBuilder: React.FC<{onAnalyze: (data: ResumeData) => void}> = ({onAna
             <button onClick={() => handleAddItem<CategorizedSkill>('skills', {id: `skill${Date.now()}`, category: '', skills: ''})} className="text-blue-600 dark:text-blue-400 font-medium">+ Add Skill Category</button>
           </div>
         </div>
-        {/* Preview and Controls Section */}
-        <div>
+        {/* Preview and Controls Section - min-width ensures full A4 for PDF capture */}
+        <div className="min-w-0 lg:min-w-[210mm]">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8 no-print transition-colors duration-200">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Preview & Export</h2>
               
